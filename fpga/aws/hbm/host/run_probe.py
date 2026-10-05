@@ -29,6 +29,7 @@ def execute(device,image,timeout):
     ret=device.read(image.address('_ret',4))
     if read_tcm(device,guard,64)!=bytes([0xa5])*64:raise RuntimeError('probe stack guard overwritten')
     return {'physical_execution':'COMPLETED','wall_seconds':time.monotonic()-begin,'probe_words':result,
+            'matvec_cycles_modulo_2_32':result[7],'matvec_q8_blocks':66,
             'return_code':ret,'status':'PASSED' if ret==0 and result[0]==0x51385031 and result[1]==0x50415353 and result[4]==33 and result[6]==1 else 'FAILING'}
 def main():
     ap=argparse.ArgumentParser(description=__doc__)

@@ -61,8 +61,14 @@ int main(void) {
   }
 #ifdef __riscv
   __asm__ volatile("fence rw, rw" ::: "memory");
+  uint32_t cycle_begin, cycle_end;
+  __asm__ volatile("rdcycle %0" : "=r"(cycle_begin));
 #endif
   if (!cm_q8_matvec(output, weights, 33, 64, input)) return fail(6, 0, 1);
+#ifdef __riscv
+  __asm__ volatile("rdcycle %0" : "=r"(cycle_end));
+  q8_probe_result[7] = cycle_end - cycle_begin;
+#endif
   for (unsigned r = 0; r < 33; ++r) {
     float expected = 0;
     for (unsigned block = 0; block < 2; ++block) {
