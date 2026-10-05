@@ -1,0 +1,436 @@
+{
+  "bundle": "ayush-hbm-ci-source-review-20261005",
+  "original_archive_bytes": 54231,
+  "original_archive_sha256": "76d216e46f45df0c42822e7740c4f991e3deddba7fbf6b17d19c386e2dbbf297",
+  "base_commit": "382b5c12030ad8eb74ab8deafb2529301faeab16",
+  "artifact_context": {
+    "tag": "2026_10_05-161524",
+    "dcp_sha256": "f962adde789fed7cfa2bdf4e90346c6162d811163083333951d80e372c1a73cb",
+    "reproduction_proven": false,
+    "inspector_reported_findings": {
+      "hbm_bytes": 17179869184,
+      "stacks": 2,
+      "ddr_enabled": false,
+      "routed_wns_ns": 0.009,
+      "tns_ns": 0,
+      "hold_slack_ns": 0.01,
+      "bus_skew_constraints_passed": 43,
+      "drc_errors": 0,
+      "drc_warnings": 1477,
+      "drc_advisories": 1,
+      "opaque_shell_critical_cdc": 4,
+      "actual_hbm_axi_mhz": 300,
+      "ref_apb_mhz": 100,
+      "memory_mhz": 900,
+      "source_provenance_complete": false,
+      "independently_reproduced_by_this_pr": false
+    }
+  },
+  "files": [
+    {
+      "path": "ci/build_from_coral.sh",
+      "original_sha256": "402a7193f9dda230958bb467d8b5b8732bf8a7c6b0dd25b9aaa3bc81a3a60530",
+      "published_sha256": "402a7193f9dda230958bb467d8b5b8732bf8a7c6b0dd25b9aaa3bc81a3a60530",
+      "bytes": 144,
+      "source_mtime_utc": "2026-10-05T16:55:18.129362+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "882ea9b9cc3ddbcebc25fb0bcae00f74d9eaf37288f7122ff4a301aaeb4a6aef",
+      "integration_bytes": 213
+    },
+    {
+      "path": "ci/generate_cl.py",
+      "original_sha256": "5f16c0efd186b995cb6356005bfa0f6f2a5547643720d30d39c55f9d7c34ff74",
+      "published_sha256": "5f16c0efd186b995cb6356005bfa0f6f2a5547643720d30d39c55f9d7c34ff74",
+      "bytes": 5739,
+      "source_mtime_utc": "2026-10-05T16:55:16.590328+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "478097ba21c1209f3bea43f158808a02df1fc92e786fcaf203bc0232a5c0eb9b",
+      "integration_bytes": 8002
+    },
+    {
+      "path": "ci/pipeline.py",
+      "original_sha256": "9930dfa3a8f5af254ca517ad684b0bb85f1e554c971eef5620fb9e3046854c32",
+      "published_sha256": "f53ca11becab37041925bee3107aee2696b4f148ec338bfedc1e218a9a82a4cf",
+      "bytes": 13220,
+      "source_mtime_utc": "2026-10-05T16:55:19.561393+00:00",
+      "change": "Replace private Coral checkout with required --coral-repo; resolve Bazel and Verilator from PATH or explicit overrides.",
+      "integration_sha256": "079f7a96c31f0222a27fcc91429e6059198d3dc0a47c9d01d0f55d9c48313bfa",
+      "integration_bytes": 15176
+    },
+    {
+      "path": "ci/run.sh",
+      "original_sha256": "ec176e59ab654a07bab6164b070b4ba3e9cc85c370bd032ba90ae05607150928",
+      "published_sha256": "6f81dd4a7a9511857c4d7dacb1f447aa723b644b39e89b5ee94b05160dbf0733",
+      "bytes": 541,
+      "source_mtime_utc": "2026-10-05T16:42:20.189604+00:00",
+      "change": "Require explicit AWS_FPGA_REPO_DIR instead of a private host default.",
+      "integration_sha256": "55227015b17d50730ddfaf5e4101747cccc24adf6d1745fae639819a911f96e7",
+      "integration_bytes": 141
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/constraints/cl_synth_user.xdc",
+      "original_sha256": "f0b0595bcec24473541a0b6a0086746dab2dc080dd103ac969d292e3ea987176",
+      "published_sha256": "f0b0595bcec24473541a0b6a0086746dab2dc080dd103ac969d292e3ea987176",
+      "bytes": 782,
+      "source_mtime_utc": "2026-10-05T16:52:49.562094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "f0b0595bcec24473541a0b6a0086746dab2dc080dd103ac969d292e3ea987176",
+      "integration_bytes": 782
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/constraints/cl_timing_user.xdc",
+      "original_sha256": "9a11e6c1c66c4386696d3b5b23ca222d1c9e3f9c5ca336fe6174dd6a60e13373",
+      "published_sha256": "9a11e6c1c66c4386696d3b5b23ca222d1c9e3f9c5ca336fe6174dd6a60e13373",
+      "bytes": 616,
+      "source_mtime_utc": "2026-10-05T16:52:49.562094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "9a11e6c1c66c4386696d3b5b23ca222d1c9e3f9c5ca336fe6174dd6a60e13373",
+      "integration_bytes": 616
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/constraints/small_shell_cl_pnr_user.xdc",
+      "original_sha256": "252d7a8d73cde75b4030bf7de811a216f717a51ceeb8c343b243d5e391a46489",
+      "published_sha256": "252d7a8d73cde75b4030bf7de811a216f717a51ceeb8c343b243d5e391a46489",
+      "bytes": 2097,
+      "source_mtime_utc": "2026-10-05T16:52:49.562094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "252d7a8d73cde75b4030bf7de811a216f717a51ceeb8c343b243d5e391a46489",
+      "integration_bytes": 2097
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/constraints/xdma_shell_cl_pnr_user.xdc",
+      "original_sha256": "5f4c39c0f85428db39ab638dc412d4f1fa4332f13d38bda5e00a61a0996ffeab",
+      "published_sha256": "5f4c39c0f85428db39ab638dc412d4f1fa4332f13d38bda5e00a61a0996ffeab",
+      "bytes": 788,
+      "source_mtime_utc": "2026-10-05T16:52:49.562094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "5f4c39c0f85428db39ab638dc412d4f1fa4332f13d38bda5e00a61a0996ffeab",
+      "integration_bytes": 788
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/scripts/build_level_1_cl.tcl",
+      "original_sha256": "42799f07b61e7c67488ddc80b5bbc06ade6ed391111335f3353bc40b5ec18b63",
+      "published_sha256": "42799f07b61e7c67488ddc80b5bbc06ade6ed391111335f3353bc40b5ec18b63",
+      "bytes": 6549,
+      "source_mtime_utc": "2026-10-05T16:52:49.561095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "42799f07b61e7c67488ddc80b5bbc06ade6ed391111335f3353bc40b5ec18b63",
+      "integration_bytes": 6549
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/build/scripts/synth_cl_coralnpu_hbm.tcl",
+      "original_sha256": "0779a1d656202d7e5e5c440b7b26e517b9d961af870c10c259a959c7951cc378",
+      "published_sha256": "0779a1d656202d7e5e5c440b7b26e517b9d961af870c10c259a959c7951cc378",
+      "bytes": 6660,
+      "source_mtime_utc": "2026-10-05T16:52:49.561095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "0779a1d656202d7e5e5c440b7b26e517b9d961af870c10c259a959c7951cc378",
+      "integration_bytes": 6660
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_coralnpu_hbm.sv",
+      "original_sha256": "7fe86c282a3483109fe71c71528fce322f2fc4cd40cc68350e7a264872e4a019",
+      "published_sha256": "7fe86c282a3483109fe71c71528fce322f2fc4cd40cc68350e7a264872e4a019",
+      "bytes": 16219,
+      "source_mtime_utc": "2026-10-05T16:52:49.560095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "c33a9aa2dcb344ee7793921acf10ab6f354523826b627c4a5072035a16b81d00",
+      "integration_bytes": 15873
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_coralnpu_hbm_defines.vh",
+      "original_sha256": "3722dae78410a941450a672fb46a7d145913660ec3eb3621cd86d72946fc7020",
+      "published_sha256": "3722dae78410a941450a672fb46a7d145913660ec3eb3621cd86d72946fc7020",
+      "bytes": 953,
+      "source_mtime_utc": "2026-10-05T16:52:49.559094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "3722dae78410a941450a672fb46a7d145913660ec3eb3621cd86d72946fc7020",
+      "integration_bytes": 953
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_dram_dma_pkg.sv",
+      "original_sha256": "b134daceedd61270dcbdb38f8ec7e430e447e4dd0c2b7be71d96be92d0e1c7fc",
+      "published_sha256": "b134daceedd61270dcbdb38f8ec7e430e447e4dd0c2b7be71d96be92d0e1c7fc",
+      "bytes": 2997,
+      "source_mtime_utc": "2026-10-05T16:52:49.560095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "73ee1998a3f6b4e61fa316c952a9e9529760a7fab6aa38d9849a3bb8158111de",
+      "integration_bytes": 2983
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_hbm_axi4.sv",
+      "original_sha256": "778a1e8f7806a4dad6a6cb245c937b5051cda32b1bdc0d44a9640f4842c249b4",
+      "published_sha256": "778a1e8f7806a4dad6a6cb245c937b5051cda32b1bdc0d44a9640f4842c249b4",
+      "bytes": 25048,
+      "source_mtime_utc": "2026-10-05T16:52:49.559094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "1acb1cc14bca1792d0f76c33567739c6434f0e1523eba42a0f533eab5bb36096",
+      "integration_bytes": 20113
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_hbm_wrapper.sv",
+      "original_sha256": "ae9521c18353f9aacc3d0224c77b7153edce890745ca0370b087623747fd2b1c",
+      "published_sha256": "ae9521c18353f9aacc3d0224c77b7153edce890745ca0370b087623747fd2b1c",
+      "bytes": 45635,
+      "source_mtime_utc": "2026-10-05T16:52:49.559094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "ae9521c18353f9aacc3d0224c77b7153edce890745ca0370b087623747fd2b1c",
+      "integration_bytes": 45635
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/cl_id_defines.vh",
+      "original_sha256": "b7f88a8af4e4916ecf66c8104634c8992de0ffd0706030c20426ba308e93e6e1",
+      "published_sha256": "b7f88a8af4e4916ecf66c8104634c8992de0ffd0706030c20426ba308e93e6e1",
+      "bytes": 1570,
+      "source_mtime_utc": "2026-10-05T16:52:49.558095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "b7f88a8af4e4916ecf66c8104634c8992de0ffd0706030c20426ba308e93e6e1",
+      "integration_bytes": 1570
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/coral_hbm_defaults.vh",
+      "original_sha256": "72aaf5ec0b629b4b2ceebdebd6f0e8fedf5dce0d630f869f664a0840196868d7",
+      "published_sha256": "72aaf5ec0b629b4b2ceebdebd6f0e8fedf5dce0d630f869f664a0840196868d7",
+      "bytes": 232,
+      "source_mtime_utc": "2026-10-05T16:52:49.560095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "72aaf5ec0b629b4b2ceebdebd6f0e8fedf5dce0d630f869f664a0840196868d7",
+      "integration_bytes": 232
+    },
+    {
+      "path": "ci/templates/cl_coralnpu_hbm/design/coral_host.sv",
+      "original_sha256": "7c556a231f603e935659a243b26ecd2c87ef5c869417c06857061a36998f1e60",
+      "published_sha256": "7c556a231f603e935659a243b26ecd2c87ef5c869417c06857061a36998f1e60",
+      "bytes": 8870,
+      "source_mtime_utc": "2026-10-05T16:52:49.559094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "256aeefef3e2e613bdb1a608caec6c0ee1eba7f36bb5dd2f56ad077e9759ee4f",
+      "integration_bytes": 9529
+    },
+    {
+      "path": "ci/templates/create_hbm_fabric.tcl",
+      "original_sha256": "dfdb5a48471c60487f252d15b37c4266489a914d7302afd05d27091ff2f45835",
+      "published_sha256": "dfdb5a48471c60487f252d15b37c4266489a914d7302afd05d27091ff2f45835",
+      "bytes": 2179,
+      "source_mtime_utc": "2026-10-05T16:52:49.564095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "dfdb5a48471c60487f252d15b37c4266489a914d7302afd05d27091ff2f45835",
+      "integration_bytes": 2179
+    },
+    {
+      "path": "ci/templates/hbm_300mhz.tcl",
+      "original_sha256": "b988b0042238fa84f6e6ca5a461b3a3e27ba553ccf14662858771a0edcea20dd",
+      "published_sha256": "b988b0042238fa84f6e6ca5a461b3a3e27ba553ccf14662858771a0edcea20dd",
+      "bytes": 582,
+      "source_mtime_utc": "2026-10-05T16:52:49.564095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "b988b0042238fa84f6e6ca5a461b3a3e27ba553ccf14662858771a0edcea20dd",
+      "integration_bytes": 582
+    },
+    {
+      "path": "ci/templates/hbm_host.py",
+      "original_sha256": "43c15b8ff4d3f98982f4adcebd5824e09fde3653f53961fb78f19bfb8399c4c8",
+      "published_sha256": "43c15b8ff4d3f98982f4adcebd5824e09fde3653f53961fb78f19bfb8399c4c8",
+      "bytes": 10974,
+      "source_mtime_utc": "2026-10-05T16:52:49.565095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "1cc83db0781a8f56ecf82e54704e0954d8563baef11df0deb312be52c9c3dfc5",
+      "integration_bytes": 12713
+    },
+    {
+      "path": "ci/templates/hdk-links.json",
+      "original_sha256": "5c8b30028d4d0a68a50accc8010a26b5d5c181303b74fb6bc00eb80118883872",
+      "published_sha256": "5c8b30028d4d0a68a50accc8010a26b5d5c181303b74fb6bc00eb80118883872",
+      "bytes": 333,
+      "source_mtime_utc": "2026-10-05T16:52:49.565095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "5c8b30028d4d0a68a50accc8010a26b5d5c181303b74fb6bc00eb80118883872",
+      "integration_bytes": 333
+    },
+    {
+      "path": "ci/templates/licenses/AWS-HDK-LICENSE.txt",
+      "original_sha256": "cc3046e7f0e600b9a230b2bf23e02c458bf8418cffac1dd893ae3768e1fc31ed",
+      "published_sha256": "cc3046e7f0e600b9a230b2bf23e02c458bf8418cffac1dd893ae3768e1fc31ed",
+      "bytes": 4783,
+      "source_mtime_utc": "2026-10-05T16:52:49.564095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "cc3046e7f0e600b9a230b2bf23e02c458bf8418cffac1dd893ae3768e1fc31ed",
+      "integration_bytes": 4783
+    },
+    {
+      "path": "ci/templates/licenses/AWS-Repository-LICENSE.txt",
+      "original_sha256": "724738f99fe72a2976cd9632375cc2fdebb9d6717c5ace738047c806164477ac",
+      "published_sha256": "724738f99fe72a2976cd9632375cc2fdebb9d6717c5ace738047c806164477ac",
+      "bytes": 11355,
+      "source_mtime_utc": "2026-10-05T16:52:49.564095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "724738f99fe72a2976cd9632375cc2fdebb9d6717c5ace738047c806164477ac",
+      "integration_bytes": 11355
+    },
+    {
+      "path": "ci/templates/simulate_fabric.tcl",
+      "original_sha256": "90055c11a8f3bb23e9d3191dce75fb456a019d546b75998c8209ceb86602fdb3",
+      "published_sha256": "90055c11a8f3bb23e9d3191dce75fb456a019d546b75998c8209ceb86602fdb3",
+      "bytes": 941,
+      "source_mtime_utc": "2026-10-05T16:52:49.564095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "90055c11a8f3bb23e9d3191dce75fb456a019d546b75998c8209ceb86602fdb3",
+      "integration_bytes": 941
+    },
+    {
+      "path": "ci/templates/test_hbm.sh",
+      "original_sha256": "2c5e73081952e6eb833deb22d87e07a156b07d7ee9523fa35e9e2d192f3fb9bc",
+      "published_sha256": "ab31412e4f20861b2abea31847f8e647b92c975592ae822f180b6b91bb5f0124",
+      "bytes": 536,
+      "source_mtime_utc": "2026-10-05T16:52:49.565095+00:00",
+      "change": "Resolve Verilator from PATH or explicit VERILATOR override.",
+      "integration_sha256": "897300af26e676c3bb3c634a710a1be8dfaab5ec8b66e11c99ba6f841a9c6725",
+      "integration_bytes": 567
+    },
+    {
+      "path": "ci/templates/tests/fabric_memory_model.sv",
+      "original_sha256": "449a55b069b34bccad2c4a828d4ebc2fbf10023c887ac24db41c5413f79b1eb3",
+      "published_sha256": "449a55b069b34bccad2c4a828d4ebc2fbf10023c887ac24db41c5413f79b1eb3",
+      "bytes": 2562,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "14f542a466966e14460af0b5aa40afd6ac28637cdfc1a5bec568a965a53a04c3",
+      "integration_bytes": 3100
+    },
+    {
+      "path": "ci/templates/tests/hbm.ld",
+      "original_sha256": "5a746d3646ce1af7cb6ebc20277332dd4ea226dbf2a7495c194fedbf33556676",
+      "published_sha256": "5a746d3646ce1af7cb6ebc20277332dd4ea226dbf2a7495c194fedbf33556676",
+      "bytes": 153,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "5a746d3646ce1af7cb6ebc20277332dd4ea226dbf2a7495c194fedbf33556676",
+      "integration_bytes": 153
+    },
+    {
+      "path": "ci/templates/tests/hbm_memory_model.sv",
+      "original_sha256": "29b1dcd6d13ead7e450b82e47e41482ac92624c8a42073de7be9318413ddb8a9",
+      "published_sha256": "29b1dcd6d13ead7e450b82e47e41482ac92624c8a42073de7be9318413ddb8a9",
+      "bytes": 2555,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "d161c0b46e0b6e88c9db289bd809e63b4e4d1b315b0479a5500d2b4d237292a4",
+      "integration_bytes": 3093
+    },
+    {
+      "path": "ci/templates/tests/hbm_vector.S",
+      "original_sha256": "27d4fb4b04cbe3ad73c5cdb3ffe46bdf2a949bc2c2ee06b0027cf3d6e8b8530b",
+      "published_sha256": "27d4fb4b04cbe3ad73c5cdb3ffe46bdf2a949bc2c2ee06b0027cf3d6e8b8530b",
+      "bytes": 466,
+      "source_mtime_utc": "2026-10-05T16:52:49.562094+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "27d4fb4b04cbe3ad73c5cdb3ffe46bdf2a949bc2c2ee06b0027cf3d6e8b8530b",
+      "integration_bytes": 466
+    },
+    {
+      "path": "ci/templates/tests/tb_fabric.sv",
+      "original_sha256": "15d17f0a4f217c50a008a41fb038965cb0d1e194f024e46dfe502044595ec7f8",
+      "published_sha256": "15d17f0a4f217c50a008a41fb038965cb0d1e194f024e46dfe502044595ec7f8",
+      "bytes": 12191,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "32c27a573a79674dceab81e29a89f9c9d6df01a4fb3605a03f0530dddc5c4df1",
+      "integration_bytes": 14849
+    },
+    {
+      "path": "ci/templates/tests/tb_hbm.sv",
+      "original_sha256": "c2eed7edab48a97c1d11c1bd518dbdd25ac5e8b4e480966418a11ca2eb5668ab",
+      "published_sha256": "c2eed7edab48a97c1d11c1bd518dbdd25ac5e8b4e480966418a11ca2eb5668ab",
+      "bytes": 7044,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "427c7072f364f6589e54a2254e09b5990c1dbe2d220108a348ee4c7ee38c7f72",
+      "integration_bytes": 7993
+    },
+    {
+      "path": "ci/templates/tests/test_hbm_loader.py",
+      "original_sha256": "1a982add49ad0b081a9db1ce582fc8002374d8e4b6234f757330cf0a920e14ba",
+      "published_sha256": "1a982add49ad0b081a9db1ce582fc8002374d8e4b6234f757330cf0a920e14ba",
+      "bytes": 1950,
+      "source_mtime_utc": "2026-10-05T16:52:49.563095+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "14be501840554e2ac74a8f129c6dc693ad0925f81d757a4539b827eb2e5029fd",
+      "integration_bytes": 2164
+    },
+    {
+      "path": "ci/test_generation.py",
+      "original_sha256": "ff7afa07988d19f232c9b39aa35dd9388d3c6ac8cf6ffff096c744b79ed69dc2",
+      "published_sha256": "ff7afa07988d19f232c9b39aa35dd9388d3c6ac8cf6ffff096c744b79ed69dc2",
+      "bytes": 3447,
+      "source_mtime_utc": "2026-10-05T16:56:13.666598+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "d144916182fc8dabc491a8c8d1813f5fb562b85a97cfa464a9a0107d28bb33f9",
+      "integration_bytes": 4832
+    },
+    {
+      "path": "ci/test_pipeline.py",
+      "original_sha256": "eabd73e70544194da47a5367dc85c1a7a36f00fb06b3898a1d85fca5ed302941",
+      "published_sha256": "eabd73e70544194da47a5367dc85c1a7a36f00fb06b3898a1d85fca5ed302941",
+      "bytes": 2994,
+      "source_mtime_utc": "2026-10-05T16:43:28.911069+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "e82bbc0f55b556b6e6104448e290374394fb79390dc2bbce90a38a87ddbe9b1a",
+      "integration_bytes": 10127
+    },
+    {
+      "path": "ci/validate.tcl",
+      "original_sha256": "e6e79c76110e7438bac92bc5e8d038331cdb4ed4bf249d76f713d57e367370c3",
+      "published_sha256": "e6e79c76110e7438bac92bc5e8d038331cdb4ed4bf249d76f713d57e367370c3",
+      "bytes": 2283,
+      "source_mtime_utc": "2026-10-05T16:42:21.314628+00:00",
+      "change": "Unchanged source bytes",
+      "integration_sha256": "02bf28e50f6b7b6a84d8ea3fd5860ef06de39b96bbe09ba6bc2a41b265c16c1b",
+      "integration_bytes": 2399
+    }
+  ],
+  "excluded": {
+    "templates/cl_coralnpu_hbm/build/constraints/generated_cl_clocks_aws.xdc": "Generated clock constraints; regenerated by the HDK build.",
+    "templates/cl_coralnpu_hbm/build/scripts/clockInfo.txt": "Prior generated Vivado clock report.",
+    "templates/cl_coralnpu_hbm/build/scripts/iter_100_CongestedCLBsAndNets.txt": "Prior generated Vivado congestion report.",
+    "generation-test-result.json": "Unbound reported test result, not source or proof of a completed build.",
+    "ci/templates/tests/hbm_vector.elf": {
+      "reason": "Prebuilt binary omitted from source-only publication; source and linker script retained",
+      "sha256": "6ceb10d3bc8136247c34085b060c017d29d750c8980088771ef22f15f47561b6"
+    }
+  },
+  "metadata_changes": [
+    "Removed private paths and host identity",
+    "Omitted capture-local filenames, uid/gid and filesystem modes",
+    "Recomputed SHA256SUMS over published files"
+  ],
+  "handoff_commit": "4b84d0b5dd484f7de3eebbdd4ab341e95846b97a",
+  "handoff_source_root": "fpga/ayush_hbm/source_handoff",
+  "handoff_review_scope": "Source sanitization, manifest and syntax checks only; supplied scripts not executed",
+  "integration_scope": "Source integration and local unit/dry-run checks; no vendor build or hardware execution",
+  "hash_field_meaning": {
+    "original_sha256": "Original delivered payload before producer sanitization",
+    "published_sha256": "Payload at the verified handoff commit",
+    "integration_sha256": "Adapted payload in this integration; current full inventory is SHA256SUMS"
+  },
+  "integration_changes": [
+    "Default source-only dry-run; explicit preflight/generation/build modes; no tool setup on dry-run.",
+    "Explicit fresh output directory outside source/HDK trees; removed generation backup/replacement behavior.",
+    "Removed S3/AFI operations and pre-generated RTL override from public build interface.",
+    "Pinned Coral, HDK, IP, shell and tool versions; reviewed complete local dependency inventory required by SHA-256.",
+    "Validate HBM density, stack count, reference/APB/memory clocks and initialization bypass configuration against pinned XCI.",
+    "Bounded stage process groups; reject error logs, missing stage products and ambiguous success markers.",
+    "H3 metadata throughout; retain delivered 300MHz physical MMCM correction and validate reopened clocks/dividers.",
+    "Strict report collection and fail-closed timing/DRC/methodology/CDC/exception/waiver gates; no source-clock exemptions.",
+    "Rebuild excluded ELF from assembly/linker sources using explicit LLVM18.1.3; no binary fixture checked in.",
+    "Distinct eight-bank host smoke patterns and distinct bank0/7 RTL simulation patterns to expose aliasing; no physical run.",
+    "Bounded ZIP input validation and no traversal, duplicate entries or archive symlinks.",
+    "Preserve all original licensing bytes; apply repository Python/ShellCheck formatting to adapted support code.",
+    "Add source-only tests, source manifest, clean-checkout reproduction commands and explicit NOT_RUN evidence boundaries.",
+    "Apply Verible formatting except byte-retained AWS cl_hbm_wrapper.sv (upstream macro parser limitation)."
+  ],
+  "upstream_configuration_sources": [
+    "https://github.com/aws/aws-fpga/blob/20fe90180574464fd509c994680ec67191e9759f/hdk/common/shell_stable/build/scripts/aws_build_dcp_from_cl.py",
+    "https://github.com/aws/aws-fpga/blob/20fe90180574464fd509c994680ec67191e9759f/hdk/common/shell_stable/build/scripts/aws_clock_properties.tcl",
+    "https://github.com/aws/aws-fpga-resources/blob/6d32be972e6da854e61a8d3d6ec0466ab491c1b3/cl_ip/cl_ip.srcs/sources_1/ip/cl_hbm/cl_hbm.xci"
+  ]
+}
