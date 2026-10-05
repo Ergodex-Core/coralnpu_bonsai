@@ -342,7 +342,8 @@ def execute(
     load_timeout=1800,
     run_timeout=3600,
     atol=1e-4,
-    rtol=1e-4
+    rtol=1e-4,
+    logits_output=None
 ):
     load_started = time.monotonic()
     result['stage'] = 'reset_and_ddr_qualification'
@@ -426,15 +427,25 @@ def execute(
         time.sleep(0.01)
     result['stage'] = 'validate_output'
     result['execution_wall_seconds'] = time.monotonic() - run_started
+    if result.get('physical_execution') == 'STARTED':
+        result['physical_execution'] = 'COMPLETED'
     device.deadline = time.monotonic() + 60
-    if device.read(plan.image.address('_ret', 4)) != 0:
-        raise AssertionError(
-            'firmware did not return zero; halt alone is not success'
-        )
     output_mailbox = list(
         struct.unpack('<32I', read_tcm(device, MAILBOX, 128))
     )
     result['mailbox'] = output_mailbox
+    cycle_names = ('prefill', 'decode', 'total', 'first_token')
+    cycles = {
+        name: output_mailbox[22 + 2 * i] | (output_mailbox[23 + 2 * i] << 32)
+        for i, name in enumerate(cycle_names)
+    }
+    # Preserve raw counters even when malformed output prevents validation.
+    # Derived timing is emitted only after the protocol and counters pass.
+    result['firmware_cycles'] = cycles
+    if device.read(plan.image.address('_ret', 4)) != 0:
+        raise AssertionError(
+            'firmware did not return zero; halt alone is not success'
+        )
     if any(output_mailbox[i] != mailbox[i]
            for i in (0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19,
                      30, 31)):
@@ -461,9 +472,26 @@ def execute(
             read_ddr(device, plan.generated_address, 4 * generated_count)
         )
     ) if generated_count else []
+    stop_reason = output_mailbox[21]
+    result.update(
+        generated_tokens=generated,
+        generated_count=generated_count,
+        stop_reason_code=stop_reason
+    )
+    rows = max(1, generated_count)
+    actual = read_ddr(device, plan.logits_address, 4 * plan.vocab * rows)
+    result.update(
+        logits_sha256=hashlib.sha256(actual).hexdigest(),
+        logits_bytes=len(actual),
+        logits_rows=rows
+    )
+    if logits_output is not None:
+        output = Path(logits_output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(actual)
+        result['logits_file'] = str(output)
     if any(token >= plan.vocab for token in generated):
         raise AssertionError('generated token is outside vocabulary')
-    stop_reason = output_mailbox[21]
     if plan.max_new_tokens:
         if any(token in plan.eos_tokens for token in generated[:-1]):
             raise AssertionError('firmware continued after an EOS token')
@@ -475,51 +503,11 @@ def execute(
             )
     elif stop_reason != 0:
         raise AssertionError('prompt-only request must have stop reason zero')
-    rows = max(1, generated_count)
-    actual = read_ddr(device, plan.logits_address, 4 * plan.vocab * rows)
-    if plan.reference is not None and rows != plan.reference_rows:
-        raise AssertionError(
-            'generated token count differs from reference rows'
-        )
-    comparisons = []
-    for i in range(rows):
-        lo, hi = i * plan.vocab * 4, (i + 1) * plan.vocab * 4
-        comparison = compare_logits(
-            actual[lo:hi],
-            None if plan.reference is None else plan.reference[lo:hi], atol,
-            rtol
-        )
-        comparison['prediction_index'] = i
-        comparisons.append(comparison)
-        if generated and generated[i] != comparison['argmax']:
-            raise AssertionError(
-                f'generated token {i} differs from returned logits argmax'
-            )
-    result.update(
-        predictions=comparisons,
-        generated_tokens=generated,
-        generated_count=generated_count,
-        stop_reason={
-            0: 'prompt_only',
-            1: 'max_new_tokens',
-            2: 'eos'
-        }[stop_reason],
-        logits_sha256=hashlib.sha256(actual).hexdigest()
-    )
-    if comparisons[-1]['argmax'] != output_mailbox[13]:
-        raise AssertionError('firmware argmax differs from returned logits')
-    result['reference_check'] = (
-        'NOT_RUN' if plan.reference is None else 'FAILING'
-        if any(x['reference_check'] != 'PASSED'
-               for x in comparisons) else 'PASSED'
-    )
-    if result['reference_check'] == 'FAILING':
-        raise AssertionError('full-logit reference comparison failed')
-    cycle_names = ('prefill', 'decode', 'total', 'first_token')
-    cycles = {
-        name: output_mailbox[22 + 2 * i] | (output_mailbox[23 + 2 * i] << 32)
-        for i, name in enumerate(cycle_names)
-    }
+    result['stop_reason'] = {
+        0: 'prompt_only',
+        1: 'max_new_tokens',
+        2: 'eos'
+    }[stop_reason]
     if not cycles['prefill'] or not cycles['total'] or cycles[
             'total'] < cycles['prefill'] + cycles['decode']:
         raise AssertionError('invalid firmware cycle counters')
@@ -546,6 +534,42 @@ def execute(
         load_and_readback_seconds=result['load_and_readback_seconds'],
         execution_wall_seconds=result['execution_wall_seconds']
     )
+    if plan.reference is not None and rows != plan.reference_rows:
+        raise AssertionError(
+            'generated token count differs from reference rows'
+        )
+    comparisons = []
+    result['predictions'] = comparisons
+    for i in range(rows):
+        lo, hi = i * plan.vocab * 4, (i + 1) * plan.vocab * 4
+        comparison = dict(prediction_index=i)
+        comparisons.append(comparison)
+        try:
+            comparison.update(
+                compare_logits(
+                    actual[lo:hi],
+                    None if plan.reference is None else plan.reference[lo:hi],
+                    atol, rtol
+                )
+            )
+        except (AssertionError, ValueError) as exc:
+            comparison['error'] = str(exc)
+            raise
+        if generated and generated[i] != comparison['argmax']:
+            comparison['generated_token'] = generated[i]
+            comparison['error'] = 'generated token differs from logits argmax'
+            raise AssertionError(
+                f'generated token {i} differs from returned logits argmax'
+            )
+    if comparisons[-1]['argmax'] != output_mailbox[13]:
+        raise AssertionError('firmware argmax differs from returned logits')
+    result['reference_check'] = (
+        'NOT_RUN' if plan.reference is None else 'FAILING'
+        if any(x['reference_check'] != 'PASSED'
+               for x in comparisons) else 'PASSED'
+    )
+    if result['reference_check'] == 'FAILING':
+        raise AssertionError('full-logit reference comparison failed')
     result.update(
         stage='complete',
         status='PASSED'
@@ -696,17 +720,19 @@ def main(argv=None):
             )
             device = Device(args.slot, args.sdk_timeout)
             report['physical_execution'] = 'STARTED'
-            actual = execute(
-                device, plan, report, args.load_timeout, args.run_timeout,
-                args.atol, args.rtol
-            )
-            report['physical_execution'] = 'COMPLETED'
             output = args.logits_output or args.report.with_suffix(
                 '.logits.f32'
             )
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(actual)
-            report['logits_file'] = str(output)
+            execute(
+                device,
+                plan,
+                report,
+                args.load_timeout,
+                args.run_timeout,
+                args.atol,
+                args.rtol,
+                logits_output=output
+            )
     except Exception as exc:
         report.update(status='FAILING', error=f'{type(exc).__name__}: {exc}')
     finally:

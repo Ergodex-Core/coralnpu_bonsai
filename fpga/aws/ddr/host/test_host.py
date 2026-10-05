@@ -234,8 +234,138 @@ class HostTests(unittest.TestCase):
 
     def test_bad_generated_token_rejected(self):
         plan = self.plan()
+        result = {}
+        output = self.root / 'bad-token.logits.f32'
         with self.assertRaisesRegex(AssertionError, 'differs'):
-            run.execute(FakeDevice(plan, bad_token=True), plan, {})
+            run.execute(
+                FakeDevice(plan, bad_token=True),
+                plan,
+                result,
+                logits_output=output
+            )
+        self.assertEqual(output.read_bytes(), struct.pack('<3f', 0, 3, 1))
+        self.assertEqual(result['generated_tokens'], [0])
+        self.assertEqual(result['predictions'][0]['argmax'], 1)
+        self.assertEqual(result['predictions'][0]['generated_token'], 0)
+        self.assertIn('error', result['predictions'][0])
+
+    def test_failed_reference_cli_retains_logits_and_timing(self):
+        reference = self.root / 'reference.f32'
+        reference.write_bytes(struct.pack('<6f', 0, 3, 2, 0, 1, 4))
+        tokens = self.root / 'tokens.json'
+        tokens.write_text('[0]')
+        plan = self.plan(max_new_tokens=2)
+        actual = struct.pack('<6f', 0, 3, 1, 0, 1, 4)
+        for explicit in (False, True):
+            with self.subTest(explicit=explicit):
+                report_path = self.root / f'report-{explicit}.json'
+                output = self.root / 'custom' / 'logits.f32' if explicit else report_path.with_suffix(
+                    '.logits.f32'
+                )
+                device = FakeDevice(plan)
+                args = [
+                    '--package',
+                    str(self.root), '--elf',
+                    str(self.elf), '--elf-sha256', self.elf_sha,
+                    '--tokens-json',
+                    str(tokens), '--max-new-tokens', '2', '--reference-logits',
+                    str(reference), '--reference-sha256',
+                    run.digest_file(reference), '--report',
+                    str(report_path), '--execute-hardware', '--expected-agfi',
+                    'agfi-1234', '--expected-shell', '0x1'
+                ]
+                if explicit:
+                    args.extend(['--logits-output', str(output)])
+                # No SDK, image command, slot lock, or hardware is accessed.
+                with mock.patch.object(run, 'Device', return_value=device), \
+                     mock.patch.object(run, 'verify_loaded_image', return_value={}), \
+                     mock.patch.object(run.os, 'open', return_value=123), \
+                     mock.patch.object(run.os, 'close'), \
+                     mock.patch.object(run.fcntl, 'flock'):
+                    rc = run.main(args)
+                result = json.loads(report_path.read_text())
+                self.assertEqual(rc, 1)
+                self.assertEqual(result['status'], 'FAILING')
+                self.assertEqual(result['reference_check'], 'FAILING')
+                self.assertEqual(result['physical_execution'], 'COMPLETED')
+                self.assertEqual(result['generated_tokens'], [1, 2])
+                self.assertEqual(result['predictions'][0]['first_mismatch'], 2)
+                self.assertEqual(len(result['predictions']), 2)
+                self.assertEqual(result['logits_file'], str(output))
+                self.assertEqual(
+                    result['logits_sha256'],
+                    hashlib.sha256(actual).hexdigest()
+                )
+                self.assertEqual(output.read_bytes(), actual)
+                self.assertEqual(
+                    result['metrics']['cycles'], result['firmware_cycles']
+                )
+                self.assertEqual(result['cleanup_reset'], 'PASSED')
+                self.assertTrue(device.closed)
+
+    def test_nonfinite_output_retained_without_json_nan(self):
+        plan = self.plan(max_new_tokens=2)
+        device, result = FakeDevice(plan), {}
+        complete = device.complete
+        poison = bytes([255]) * 4
+
+        def complete_with_poison():
+            complete()
+            device.put(plan.logits_address + 3 * 4, poison)
+
+        output = self.root / 'nonfinite.logits.f32'
+        with mock.patch.object(device, 'complete',
+                               side_effect=complete_with_poison):
+            with self.assertRaisesRegex(AssertionError, 'NaN'):
+                run.execute(device, plan, result, logits_output=output)
+        self.assertEqual(
+            output.read_bytes(),
+            struct.pack('<3f', 0, 3, 1) + poison + struct.pack('<2f', 1, 4)
+        )
+        self.assertEqual(result['predictions'][0]['argmax'], 1)
+        self.assertEqual(result['predictions'][1]['prediction_index'], 1)
+        self.assertIn('NaN', result['predictions'][1]['error'])
+        self.assertEqual(result['generated_tokens'], [1, 2])
+        json.dumps(result, allow_nan=False)
+
+    def test_invalid_cycles_retained_without_derived_metrics(self):
+        plan = self.plan(max_new_tokens=2)
+        device, result = FakeDevice(plan), {}
+        complete = device.complete
+
+        def complete_with_bad_cycles():
+            complete()
+            device.put(run.MAILBOX + 26 * 4, struct.pack('<I', 50))
+
+        output = self.root / 'bad-cycles.logits.f32'
+        with mock.patch.object(device, 'complete',
+                               side_effect=complete_with_bad_cycles):
+            with self.assertRaisesRegex(AssertionError, 'cycle counters'):
+                run.execute(device, plan, result, logits_output=output)
+        self.assertEqual(result['firmware_cycles']['total'], 50)
+        self.assertNotIn('metrics', result)
+        self.assertEqual(
+            output.read_bytes(), struct.pack('<6f', 0, 3, 1, 0, 1, 4)
+        )
+
+    def test_invalid_generated_id_retained_with_full_logits(self):
+        plan = self.plan()
+        device, result = FakeDevice(plan), {}
+        complete = device.complete
+
+        def complete_with_bad_id():
+            complete()
+            device.put(plan.generated_address, struct.pack('<I', plan.vocab))
+
+        output = self.root / 'invalid-id.logits.f32'
+        with mock.patch.object(device, 'complete',
+                               side_effect=complete_with_bad_id):
+            with self.assertRaisesRegex(AssertionError, 'outside vocabulary'):
+                run.execute(device, plan, result, logits_output=output)
+        self.assertEqual(result['generated_tokens'], [plan.vocab])
+        self.assertEqual(result['stop_reason_code'], 1)
+        self.assertNotIn('metrics', result)
+        self.assertEqual(output.read_bytes(), struct.pack('<3f', 0, 3, 1))
 
     def test_readback_corruption(self):
         plan = self.plan()

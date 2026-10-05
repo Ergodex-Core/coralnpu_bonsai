@@ -51,6 +51,12 @@ Seconds and decode tokens/second use the wrapper's nominal 50 MHz core clock;
 physical timing remains unqualified until the image passes implementation and
 hardware gates. Decode counts exclude the first token produced by prefill.
 The default result file is the report path with suffix `.logits.f32`.
+Once bounded output readback is available, that binary is saved before output
+validation, including on failed logit comparisons, nonfinite values or token
+mismatches. Failure reports retain generated IDs, available prediction
+diagnostics and raw `firmware_cycles`; derived timing requires valid completion
+and counters. `physical_execution: COMPLETED` records observed core halt and
+does not imply that firmware or numerical validation passed.
 
 ```sh
 python3 -m unittest discover -s fpga/aws/ddr/host -p 'test_*.py' -v
