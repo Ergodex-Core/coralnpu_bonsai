@@ -1,15 +1,16 @@
 # Coral HBM build automation
 
 This is Ayush's delivered `ci/build_from_coral.sh`, CL templates and required
-support, adapted for a separate manual build workflow. It targets the pinned
+support, adapted for a manual build workflow and automatic Blacksmith source
+checks. It targets the pinned
 Coral RVV128 core with 16 GiB HBM (two stacks), DDR disabled, a 50 MHz NPU,
 250 MHz shell interface and 300 MHz HBM AXI clock. It does not change PR #1's
 CI/controller, PR #2's DDR design, or the separately sealed HBM artifact.
 
 The default command is a source-only dry-run. Building requires an explicit
 mode, an isolated licensed Linux environment, pinned inputs and a fresh output
-directory. No workflow is activated and no upload, AFI creation, FPGA load or
-physical test is performed by the pipeline. `BUILD.bazel` keeps these templates
+directory. No licensed builder is activated and no upload, AFI creation, FPGA
+load or physical test is performed by the pipeline. `BUILD.bazel` keeps these templates
 out of the existing Nexus recursive source glob.
 
 ## Source and evidence
@@ -34,7 +35,8 @@ Physical calibration and inference are **NOT_RUN** by this integration.
 
 ## Cheap checks from a clean checkout
 
-Use Python 3.11 or newer and Bash. These commands do not require Vivado, AWS,
+Use Python 3.12 on Linux x86_64 and Bash for the pinned CI tool environment.
+These commands do not require Vivado, AWS,
 Bazel, an FPGA or an ELF binary:
 
 ```bash
@@ -42,19 +44,76 @@ git clone --branch codex/ayush-build-automation \
   https://github.com/Ergodex-Core/coralnpu_bonsai.git coral-automation
 cd coral-automation
 git rev-parse HEAD
+python3.12 -m venv ../hbm-check-tools
+../hbm-check-tools/bin/python -m pip --isolated --disable-pip-version-check install \
+  --require-hashes --only-binary=:all: --no-deps \
+  -r fpga/ayush_hbm/ci/requirements-source.lock
 (cd fpga/ayush_hbm && sha256sum --check SHA256SUMS)
 bash fpga/ayush_hbm/ci/build_from_coral.sh --dry-run
-python3 -m unittest discover -s fpga/ayush_hbm/ci -p 'test_*.py' -v
-python3 utils/check_macro_signatures.py
+../hbm-check-tools/bin/python fpga/ayush_hbm/ci/source_checks.py \
+  --expected-sha "$(git rev-parse HEAD)" --output ../hbm-source-evidence
 ```
 
 The unit tests use fabricated reports, small RTL archives and fake devices.
 They exercise failure handling and policy; they are not Vivado or FPGA evidence.
 Record the exact integration commit printed above alongside test results.
-[VALIDATION.json](VALIDATION.json) records the 29 local tests and remaining gaps.
+[VALIDATION.json](VALIDATION.json) records the local tests and remaining gaps.
 The aggregate linter remains incomplete: buildifier and `mdl` are unavailable;
 Verible cannot parse a macro in the byte-retained AWS `cl_hbm_wrapper.sv`.
 Eight other SystemVerilog files were formatted and checked.
+
+## Blacksmith CI and licensed builder boundary
+
+[The source workflow](../../.github/workflows/ayush-hbm.yml) runs for pull
+requests and manual dispatch on `blacksmith-2vcpu-ubuntu-2404`. It checks out
+the exact PR head (or dispatch SHA), disables persisted credentials and uses
+only `contents: read`. It verifies a clean checkout before and after checks,
+the source manifest, the real default dry-run, unit tests, Python formatting,
+ShellCheck, Bash syntax and repository macro signatures. Tool wheels and GitHub
+actions are hash-pinned. Source diagnostics include the checked-out commit and
+hashes of the workflow, manifest, design pins and tool lock. They are retained
+for seven days, including a failed receipt when a check fails. They are
+untrusted PR output and cannot authorize a build or certify a checkpoint.
+
+The separate **HBM licensed build qualification (blocked)** job deliberately
+fails after passing source checks. A green source job does not mean that
+Vivado ran. Changing repository backend flags cannot enable this job. This
+draft is not ready to merge while the licensed gate is blocked. No job has
+AWS credentials, OIDC, Vivado, an FPGA, SSM dispatch or a deployment action.
+
+PR #1 owns the trusted-main controller and its immutable on-chip/H2 runtime.
+The reviewed contract at commit
+`a0d2387e804515e9a94575a20443ca378c4e542e` cannot execute this HBM/H3 flow:
+it binds another source workflow/job and baked build paths/qualifier. Its
+eligibility policy also rejects draft PRs. We preserve its shared paths and
+do not add a second controller. [ci/trusted_contract.json](ci/trusted_contract.json)
+records the inspected file hashes and the missing profile requirements.
+
+Before replacing the blocked job, the CI owner must separately review an
+immutable HBM profile in the existing trusted-main orchestration. It must:
+
+- Re-resolve current PR eligibility and the exact head SHA using fresh GitHub
+  data; bind this source workflow/job without trusting its artifacts. Preserve
+  exact-SHA approval, pinned SSM document and isolated execution requirements.
+- Bind both the integration/template SHA and the Coral source SHA. The manual
+  pipeline currently requires Coral `382b5c12...`; it cannot build arbitrary
+  PR heads just by changing the checkout. Any profile extension must validate
+  the changed Coral interface and templates together, record both identities
+  and retain dependency/tool hash validation.
+- Use a provisioned, isolated, licensed AWS builder with reviewed identity,
+  resource limits, license access and artifact transfer. Blacksmith runs the
+  cheap checks; it is not a qualified Vivado host. No live qualification of
+  these operational requirements has been performed here.
+- Execute source generation, template assembly, HDK synthesis and route,
+  reopened-DCP timing/DRC/CDC/clock gates and exact-DCP tar qualification using
+  H3/300 MHz HBM, 50 MHz NPU, 250 MHz shell, 43 skew constraints and no DDR.
+  Preserve failing/unknown report behavior; do not inherit TCM/H2 acceptance.
+- Keep build qualification separate from physical calibration and inference.
+  These remain NOT_RUN until actual hardware evidence exists; a hardware
+  timeout or missing readiness evidence must never become a physical pass.
+
+Publishing this PR update starts ordinary source CI. It does not activate a
+licensed build, change PR #1/#2, or compete with the ongoing FPGA inference work.
 
 ## Manual licensed workflow
 

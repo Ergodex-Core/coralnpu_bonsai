@@ -1,8 +1,8 @@
 {
   "scope": "Cloud source integration; no licensed build or FPGA operation",
   "unit_tests": {
-    "command": "python3 -m unittest discover -s fpga/ayush_hbm/ci -p 'test_*.py' -v",
-    "passed": 29,
+    "command": "hbm-check-tools/bin/python -m unittest discover -s fpga/ayush_hbm/ci -p test_*.py -v",
+    "passed": 35,
     "failed": 0
   },
   "source_dry_run": "PASS",
@@ -36,5 +36,12 @@
     "version": "v0.0-4296-g0f262651",
     "checked_source_files": 8,
     "exception": "Byte-retained cl_hbm_wrapper.sv uses CONNECT_HBM_APB_MON macros the formatter cannot parse; no new RTL syntax qualification is claimed"
+  },
+  "blacksmith_ci": {
+    "local_workflow_lint": "PASS: actionlint 1.7.12; official Linux amd64 archive SHA256 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+    "pinned_wheel_install": "PASS: isolated Python 3.12 venv, require-hashes, binary-only, no-deps",
+    "remote_execution": "NOT_RUN during local validation; inspect exact published SHA",
+    "licensed_gate": "BLOCKED: HBM_TRUSTED_PROFILE_MISSING",
+    "live_builder_qualification": "NOT_RUN"
   }
 }

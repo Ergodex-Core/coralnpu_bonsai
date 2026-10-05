@@ -1,0 +1,5 @@
+# CPython 3.12, Linux x86_64; tools only, no AWS SDK or licensed dependencies.
+yapf==0.43.0 --hash=sha256:224faffbc39c428cb095818cf6ef5511fdab6f7430a10783fdfb292ccf2852ca
+platformdirs==4.12.3 --hash=sha256:080f3b39423b5abfca9a23d84c4e9795f54d395cd8459867a8ded44084fcd5f8
+shellcheck-py==0.10.0.1 --hash=sha256:c1c266f7f54cd286057c592ead3095f93d123acdcabf048879a7d8900c3aac7b
+PyYAML==6.0.3 --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc

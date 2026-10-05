@@ -426,11 +426,16 @@
     "Bounded ZIP input validation and no traversal, duplicate entries or archive symlinks.",
     "Preserve all original licensing bytes; apply repository Python/ShellCheck formatting to adapted support code.",
     "Add source-only tests, source manifest, clean-checkout reproduction commands and explicit NOT_RUN evidence boundaries.",
-    "Apply Verible formatting except byte-retained AWS cl_hbm_wrapper.sv (upstream macro parser limitation)."
+    "Apply Verible formatting except byte-retained AWS cl_hbm_wrapper.sv (upstream macro parser limitation).",
+    "Add unprivileged Blacksmith exact-commit source checks with hash-pinned tools and an explicitly blocked licensed gate; preserve PR1 controller/runtime pending reviewed HBM profile."
   ],
   "upstream_configuration_sources": [
     "https://github.com/aws/aws-fpga/blob/20fe90180574464fd509c994680ec67191e9759f/hdk/common/shell_stable/build/scripts/aws_build_dcp_from_cl.py",
     "https://github.com/aws/aws-fpga/blob/20fe90180574464fd509c994680ec67191e9759f/hdk/common/shell_stable/build/scripts/aws_clock_properties.tcl",
     "https://github.com/aws/aws-fpga-resources/blob/6d32be972e6da854e61a8d3d6ec0466ab491c1b3/cl_ip/cl_ip.srcs/sources_1/ip/cl_hbm/cl_hbm.xci"
-  ]
+  ],
+  "blacksmith_workflow": {
+    "path": ".github/workflows/ayush-hbm.yml",
+    "sha256": "466c1f90f9430486e91c53bd35246ac2a7ec8d3ae02c598ddffb693c73440e20"
+  }
 }

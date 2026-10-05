@@ -1,0 +1,51 @@
+name: Coral HBM source checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ayush-hbm-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-checks:
+    name: HBM source and policy checks
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned source-check tools
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/hbm-check-tools"
+          "$RUNNER_TEMP/hbm-check-tools/bin/python" -m pip --isolated --disable-pip-version-check install --require-hashes --only-binary=:all: --no-deps -r fpga/ayush_hbm/ci/requirements-source.lock
+      - name: Check the exact source revision
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          "$RUNNER_TEMP/hbm-check-tools/bin/python" fpga/ayush_hbm/ci/source_checks.py --expected-sha "$EXPECTED_SOURCE_SHA" --output "$RUNNER_TEMP/hbm-source-evidence"
+      - name: Preserve source diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hbm-source-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hbm-source-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+  licensed-readiness:
+    name: HBM licensed build qualification (blocked)
+    needs: source-checks
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 2
+    steps:
+      - name: Require the separately reviewed HBM builder profile
+        run: |
+          echo '::error::HBM_TRUSTED_PROFILE_MISSING: PR #1 trusted runtime supports the on-chip/H2 design. HBM/H3 requires a reviewed immutable profile and qualified isolated licensed builder. No Vivado build, routed tar, calibration or inference was run.'
+          exit 1
