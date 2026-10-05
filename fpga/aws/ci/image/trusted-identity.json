@@ -1,0 +1,12 @@
+{
+  "files": {
+    "fpga/aws/build/build.py": "d913d65d74de0af27aeb992cdc80fd41a653e95fcccb65062924c64a81d02ee9",
+    "fpga/aws/build/gates.py": "827afa80c2506cc764132405c113c4791919725b9a6b1add258a573f45cf23b9",
+    "fpga/aws/build/license_probe.tcl": "375e43e7c804579fb89142b36e46f1e796778f1bf2b6cfc9556da5fcf27d6e3f",
+    "fpga/aws/build/pins.json": "ca05297f2db0ffde6af629ce06293474040e05626a318d975400df3bf402014e",
+    "fpga/aws/build/sim/tb_host.sv": "a170c5e9f1c53630b12b7e8a62bea97a38f949fe03184739dcc055fcf938a14f",
+    "fpga/aws/build/validate_checkpoint.tcl": "33959fd70f2596f5584ee78eed335c83b4813bab1f2c1449f84c0adf58947d20"
+  },
+  "repository": "Ergodex-Core/coralnpu_bonsai",
+  "trusted_commit": "fa0aeef84ea6dd9bdecb5f6d78f5b9fd29a28f56"
+}

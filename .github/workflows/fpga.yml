@@ -24,21 +24,32 @@ jobs:
         run: python3 fpga/aws/build/build.py --source-check
       - name: Test the BAR0 runner and ELF validation
         run: python3 -m unittest discover -s fpga/aws/tests -p 'test_*.py' -v
+      - name: Install hash-pinned SDK for isolated adapter tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/fpga-ci-sdk"
+          "$RUNNER_TEMP/fpga-ci-sdk/bin/python" -m pip --isolated --disable-pip-version-check install --require-hashes --only-binary=:all: --no-deps -r fpga/aws/ci/requirements-controller.lock
+      - name: Test the fixed controller and host adapters without AWS access
+        run: '"$RUNNER_TEMP/fpga-ci-sdk/bin/python" -m unittest discover -s fpga/aws/ci/tests -p "test_*.py" -v'
+      - name: Test immutable image entrypoints without building an image
+        run: python3 fpga/aws/ci/image/test_entrypoint.py
       - name: Check simulation macro signatures
         run: python3 utils/check_macro_signatures.py
 
   readiness:
-    name: Licensed Blacksmith builder readiness
+    name: FPGA backend routing and readiness
     needs: source-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     outputs:
       enabled: ${{ steps.readiness.outputs.enabled }}
+      backend: ${{ steps.readiness.outputs.backend }}
     steps:
-      - name: Require an explicitly provisioned and approved builder
+      - name: Select only an explicitly qualified build backend
         id: readiness
         env:
-          ENABLED: ${{ vars.FPGA_BUILD_ENABLED }}
+          BACKEND: ${{ vars.FPGA_CI_BACKEND || 'source-only' }}
+          DIRECT_ENABLED: ${{ vars.FPGA_BUILD_ENABLED }}
+          SSM_ENABLED: ${{ vars.FPGA_SSM_ENABLED }}
           RUNNER: ${{ vars.FPGA_BLACKSMITH_RUNNER }}
           HDK_ROOT: ${{ vars.FPGA_HDK_ROOT }}
           VIVADO_SETTINGS: ${{ vars.FPGA_VIVADO_SETTINGS }}
@@ -46,22 +57,45 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$IS_FORK" == true ]]; then
-            echo '::error::Fork source checks ran; licensed FPGA builds require a reviewed branch in this repository.'
-            echo 'FPGA build blocked: fork code has no access to the licensed builder. No routed artifact was produced.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          if [[ "$ENABLED" != true || -z "$RUNNER" || -z "$HDK_ROOT" || -z "$VIVADO_SETTINGS" ]]; then
-            echo '::error::FPGA builder is not activated. Provision and approve a licensed ephemeral Blacksmith runner, then configure FPGA_BUILD_ENABLED, FPGA_BLACKSMITH_RUNNER, FPGA_HDK_ROOT, and FPGA_VIVADO_SETTINGS.'
-            echo 'FPGA build blocked: runner/tool/license prerequisites have not been configured. No routed artifact was produced. See fpga/aws/README.md.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          case "$BACKEND" in
+            source-only)
+              echo '::error::FPGA builds are disabled (source-only backend). Source checks passed; no routed artifact was produced.'
+              echo 'Select and qualify a direct or SSM backend before enabling licensed builds. See fpga/aws/ci/README.md.' >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            ssm)
+              if [[ "$SSM_ENABLED" != true ]]; then
+                echo '::error::SSM FPGA backend is not activated. The trusted-main controller and target-host runtime must be installed and qualified before FPGA_SSM_ENABLED=true.'
+                echo 'Source checks passed; SSM runtime remains disabled and no routed artifact was produced.' >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+              echo 'backend=ssm' >> "$GITHUB_OUTPUT"
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              echo 'Build handoff uses the trusted-main controller workflow. That workflow verifies current exact-SHA eligibility, host readiness, and qualified artifacts independently.' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            direct)
+              if [[ "$IS_FORK" == true ]]; then
+                echo '::error::Fork source checks passed; direct licensed builders cannot execute fork code. Use the qualified SSM route with maintainer approval of the exact SHA.'
+                exit 1
+              fi
+              if [[ "$DIRECT_ENABLED" != true || -z "$RUNNER" || -z "$HDK_ROOT" || -z "$VIVADO_SETTINGS" ]]; then
+                echo '::error::Direct FPGA builder is not activated. Qualify its isolation, tools and license, then configure FPGA_BUILD_ENABLED, FPGA_BLACKSMITH_RUNNER, FPGA_HDK_ROOT, and FPGA_VIVADO_SETTINGS.'
+                echo 'Source checks passed; no routed artifact was produced.' >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+              echo 'backend=direct' >> "$GITHUB_OUTPUT"
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo '::error::FPGA_CI_BACKEND must be source-only, direct, or ssm.'
+              exit 1
+              ;;
+          esac
 
   build:
     name: Route, qualify, and package FPGA checkpoint
     needs: [source-checks, readiness]
-    if: needs.readiness.outputs.enabled == 'true'
+    if: needs.readiness.outputs.backend == 'direct' && needs.readiness.outputs.enabled == 'true'
     runs-on: ${{ vars.FPGA_BLACKSMITH_RUNNER }}
     timeout-minutes: 360
     # One licensed build at a time; no image-promotion or AWS credentials here.
