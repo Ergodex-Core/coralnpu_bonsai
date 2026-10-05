@@ -1,0 +1,5 @@
+{
+  "cl_coralnpu_hbm/build/scripts/build_all.tcl": "hdk/common/shell_stable/build/scripts/build_all.tcl",
+  "cl_coralnpu_hbm/build/scripts/aws_build_dcp_from_cl.py": "hdk/common/shell_stable/build/scripts/aws_build_dcp_from_cl.py",
+  "cl_coralnpu_hbm/build/scripts/encrypt.tcl": "hdk/common/shell_stable/build/scripts/encrypt.tcl"
+}
