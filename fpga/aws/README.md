@@ -13,6 +13,9 @@ Source checks and host-runner regression tests are separate from synthesis,
 routing, and physical FPGA tests. A source-check pass does not prove any of
 those later stages.
 
+Source and host-test checks run on `blacksmith-2vcpu-ubuntu-2404`, with a
+ten-minute timeout and no licensed tools or host credentials.
+
 The PR workflow deliberately fails its readiness job until a licensed,
 isolated Blacksmith builder is provisioned and approved. Committing this YAML
 does not enable a working FPGA build service. No existing image is uploaded,
