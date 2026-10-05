@@ -25,7 +25,6 @@ preserve their evidence and reject deployment packaging until those issues are
 resolved or a separately reviewed exact baseline is implemented. No generic rule
 waivers or previously approved warning dispositions are included.
 
-
 ## Generated RTL identity and preserved reference inputs
 
 Fresh generation verifies all five SCM CSR words against the actual checkout
