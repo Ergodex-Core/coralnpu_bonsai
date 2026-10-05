@@ -5,7 +5,9 @@
 module coral_ddr_backend #(
     parameter integer TIMEOUT_CYCLES = 1048576
 ) (
-    input wire clk, rst_n, ddr_ready,
+    input wire clk,
+    rst_n,
+    ddr_ready,
     output logic fault,
     input wire [1:0] req_valid,
     output logic [1:0] req_ready,
@@ -26,7 +28,8 @@ module coral_ddr_backend #(
     input wire m_awready,
     output wire [511:0] m_wdata,
     output wire [63:0] m_wstrb,
-    output wire m_wlast, m_wvalid,
+    output wire m_wlast,
+    m_wvalid,
     input wire m_wready,
     input wire [15:0] m_bid,
     input wire [1:0] m_bresp,
@@ -42,10 +45,11 @@ module coral_ddr_backend #(
     input wire [15:0] m_rid,
     input wire [511:0] m_rdata,
     input wire [1:0] m_rresp,
-    input wire m_rlast, m_rvalid,
+    input wire m_rlast,
+    m_rvalid,
     output wire m_rready
 );
-  localparam [1:0] IDLE=0, ACTIVE=1, RESPOND=2, STOPPED=3;
+  localparam [1:0] IDLE = 0, ACTIVE = 1, RESPOND = 2, STOPPED = 3;
   logic [1:0] state;
   logic owner_q, last_owner, write_q, inflight, done_q;
   logic aw_pending, w_pending, ar_pending;
@@ -63,14 +67,13 @@ module coral_ddr_backend #(
   always_comb begin
     req_ready = 0;
     rsp_valid = 0;
-    if (rst_n && state == IDLE && ddr_ready && !fault)
-      req_ready[selected] = 1;
+    if (rst_n && state == IDLE && ddr_ready && !fault) req_ready[selected] = 1;
     if (state == RESPOND) rsp_valid[owner_q] = 1;
   end
   assign rsp_rdata = rdata_q;
   assign rsp_resp = resp_q;
   assign m_awid = 0;
-  assign m_awaddr = {32'b0,addr_q};
+  assign m_awaddr = {32'b0, addr_q};
   assign m_awlen = 0;
   assign m_awsize = 6;
   assign m_awburst = 1;
@@ -81,7 +84,7 @@ module coral_ddr_backend #(
   assign m_wvalid = w_pending;
   assign m_bready = inflight && write_q && !done_q && !aw_pending && !w_pending;
   assign m_arid = 0;
-  assign m_araddr = {32'b0,addr_q};
+  assign m_araddr = {32'b0, addr_q};
   assign m_arlen = 0;
   assign m_arsize = 6;
   assign m_arburst = 1;
@@ -112,7 +115,8 @@ module coral_ddr_backend #(
       if (m_arvalid && m_arready) ar_pending <= 0;
       if (write_response || (read_response && m_rlast)) done_q <= 1;
       case (state)
-        IDLE: if (take) begin
+        IDLE:
+        if (take) begin
           owner_q <= selected;
           last_owner <= selected;
           write_q <= req_write[selected];
@@ -137,30 +141,32 @@ module coral_ddr_backend #(
         end
         ACTIVE: begin
           watchdog <= watchdog + 1'b1;
-          if (!ddr_ready || watchdog >= TIMEOUT_CYCLES-1) begin
-            fault <= 1;
-            resp_q <= 2'b10;
+          if (!ddr_ready || watchdog >= TIMEOUT_CYCLES - 1) begin
+            fault   <= 1;
+            resp_q  <= 2'b10;
             rdata_q <= 0;
-            state <= RESPOND;
+            state   <= RESPOND;
           end else if (write_response) begin
             resp_q <= m_bid == 0 ? m_bresp : 2'b10;
             if (m_bid != 0) fault <= 1;
             state <= RESPOND;
           end else if (read_response) begin
             rdata_q <= m_rdata;
-            resp_q <= (m_rid == 0 && m_rlast) ? m_rresp : 2'b10;
+            resp_q  <= (m_rid == 0 && m_rlast) ? m_rresp : 2'b10;
             if (m_rid != 0 || !m_rlast) fault <= 1;
             state <= RESPOND;
           end
         end
-        RESPOND: if (rsp_valid[owner_q] && rsp_ready[owner_q]) begin
+        RESPOND:
+        if (rsp_valid[owner_q] && rsp_ready[owner_q]) begin
           if (fault) state <= STOPPED;
           else begin
             inflight <= 0;
             state <= IDLE;
           end
         end
-        STOPPED: begin end
+        STOPPED: begin
+        end
         default: state <= STOPPED;
       endcase
     end

@@ -13,13 +13,15 @@ TCM_REGIONS = ((0, 0x2000), (0x10000, 0x18000))
 
 
 def in_tcm(address, size):
-    return size >= 0 and any(lo <= address and address + size <= hi
-                             for lo, hi in TCM_REGIONS)
+    return size >= 0 and any(
+        lo <= address and address + size <= hi for lo, hi in TCM_REGIONS
+    )
 
 
 def ddr_offset(address, size):
-    if not isinstance(address, int) or not isinstance(size, int) or size < 0 or not (
-            DDR_BASE <= address and address + size <= DDR_BASE + DDR_BYTES):
+    if not isinstance(address, int) or not isinstance(
+            size, int) or size < 0 or not (DDR_BASE <= address and address +
+                                           size <= DDR_BASE + DDR_BYTES):
         raise ValueError('DDR address/length outside the mapped 2 GiB window')
     return address - DDR_BASE
 
@@ -42,16 +44,27 @@ def _sdk_worker(pipe, slot, mode, buffer):
         lib.fpga_pci_init.argtypes = []
         check(lib.fpga_pci_init())
         if mode == 'ocl':
-            lib.fpga_pci_attach.argtypes = [C.c_int, C.c_int, C.c_int, C.c_uint32,
-                                          C.POINTER(C.c_int)]
+            lib.fpga_pci_attach.argtypes = [
+                C.c_int, C.c_int, C.c_int, C.c_uint32,
+                C.POINTER(C.c_int)
+            ]
             lib.fpga_pci_detach.argtypes = [C.c_int]
-            lib.fpga_pci_peek.argtypes = [C.c_int, C.c_uint64, C.POINTER(C.c_uint32)]
+            lib.fpga_pci_peek.argtypes = [
+                C.c_int, C.c_uint64,
+                C.POINTER(C.c_uint32)
+            ]
             lib.fpga_pci_poke.argtypes = [C.c_int, C.c_uint64, C.c_uint32]
             check(lib.fpga_pci_attach(slot, 0, 0, 0, C.byref(handle)))
         else:
-            lib.fpga_dma_open_queue.argtypes = [C.c_int, C.c_int, C.c_int, C.c_bool]
-            lib.fpga_dma_burst_read.argtypes = [C.c_int, C.c_void_p, C.c_size_t, C.c_size_t]
-            lib.fpga_dma_burst_write.argtypes = [C.c_int, C.c_void_p, C.c_size_t, C.c_size_t]
+            lib.fpga_dma_open_queue.argtypes = [
+                C.c_int, C.c_int, C.c_int, C.c_bool
+            ]
+            lib.fpga_dma_burst_read.argtypes = [
+                C.c_int, C.c_void_p, C.c_size_t, C.c_size_t
+            ]
+            lib.fpga_dma_burst_write.argtypes = [
+                C.c_int, C.c_void_p, C.c_size_t, C.c_size_t
+            ]
             # FPGA_DMA_XDMA = 1; resolve slot through SDK, never guess /dev IDs.
             readfd = lib.fpga_dma_open_queue(1, slot, 0, True)
             writefd = lib.fpga_dma_open_queue(1, slot, 0, False)
@@ -74,7 +87,9 @@ def _sdk_worker(pipe, slot, mode, buffer):
                 check(lib.fpga_dma_burst_read(readfd, aligned, value, address))
                 pipe.send((True, value))
             elif mode == 'dma' and operation == 'write':
-                check(lib.fpga_dma_burst_write(writefd, aligned, value, address))
+                check(
+                    lib.fpga_dma_burst_write(writefd, aligned, value, address)
+                )
                 pipe.send((True, None))
             else:
                 raise ValueError('invalid worker operation')
@@ -101,6 +116,7 @@ def _sdk_worker(pipe, slot, mode, buffer):
 
 
 class Worker:
+
     def __init__(self, slot, mode, timeout=5, target=_sdk_worker):
         self.timeout = timeout
         self.mode = mode
@@ -110,7 +126,9 @@ class Worker:
         self.buffer = context.RawArray('B', CHUNK_BYTES + 4095)
         self.aligned = (C.addressof(self.buffer) + 4095) & ~4095
         self.pipe, child = context.Pipe()
-        self.process = context.Process(target=target, args=(child, slot, mode, self.buffer), daemon=True)
+        self.process = context.Process(
+            target=target, args=(child, slot, mode, self.buffer), daemon=True
+        )
         self.process.start()
         child.close()
         self.receive('attach', float('inf'))
@@ -124,7 +142,9 @@ class Worker:
             ok, value = self.pipe.recv()
         except (EOFError, OSError) as exc:
             self.stop()
-            raise RuntimeError(f'SDK worker exited during {operation}') from exc
+            raise RuntimeError(
+                f'SDK worker exited during {operation}'
+            ) from exc
         if not ok:
             self.stop()
             raise RuntimeError(value)
@@ -164,6 +184,7 @@ class Worker:
 
 
 class Device:
+
     def __init__(self, slot, timeout=5):
         self.slot, self.timeout = slot, timeout
         self.deadline = float('inf')
@@ -172,13 +193,14 @@ class Device:
 
     def read(self, address):
         if address % 4 or not (in_tcm(address, 4) or address in
-                (CSR, CSR + 4, CSR + 8, DDR_CSR, DDR_CSR + 4,
-                 DDR_CSR + 8, DDR_CSR + 12, DDR_CSR + 16)):
+                               (CSR, CSR + 4, CSR + 8, DDR_CSR, DDR_CSR + 4,
+                                DDR_CSR + 8, DDR_CSR + 12, DDR_CSR + 16)):
             raise ValueError('MMIO read outside TCM/control/DDR status')
         return self.ocl.request('read', address, None, self.deadline)
 
     def write(self, address, value):
-        if address % 4 or not (in_tcm(address, 4) or address in (CSR, CSR + 4)):
+        if address % 4 or not (in_tcm(address, 4)
+                               or address in (CSR, CSR + 4)):
             raise ValueError('MMIO write outside TCM/control')
         if not isinstance(value, int) or not 0 <= value <= 0xffffffff:
             raise ValueError('MMIO value is not uint32')
@@ -188,7 +210,9 @@ class Device:
         size = value if operation == 'read' else len(value)
         offset = ddr_offset(address, size)
         if address % 64 or not 0 < size <= CHUNK_BYTES or size % 64:
-            raise ValueError('DMA accesses must be 64-byte aligned, 64 bytes..1 MiB')
+            raise ValueError(
+                'DMA accesses must be 64-byte aligned, 64 bytes..1 MiB'
+            )
         if self.dma is None:
             self.dma = Worker(self.slot, 'dma', self.timeout)
         return self.dma.request(operation, offset, value, self.deadline)
@@ -223,8 +247,10 @@ class Device:
 def read_tcm(device, address, size):
     if not in_tcm(address, size):
         raise ValueError('read outside TCM')
-    raw = b''.join(device.read(a).to_bytes(4, 'little')
-                   for a in range(address & ~3, (address + size + 3) & ~3, 4))
+    raw = b''.join(
+        device.read(a).to_bytes(4, 'little')
+        for a in range(address & ~3, (address + size + 3) & ~3, 4)
+    )
     return raw[address % 4:address % 4 + size]
 
 
@@ -233,7 +259,8 @@ def write_tcm(device, address, data):
         raise ValueError('write outside TCM')
     for a in range(address & ~3, (address + len(data) + 3) & ~3, 4):
         lo, hi = max(a, address), min(a + 4, address + len(data))
-        word = bytearray(device.read(a).to_bytes(4, 'little')) if hi - lo < 4 else bytearray(4)
+        word = bytearray(device.read(a).to_bytes(4, 'little')
+                         ) if hi - lo < 4 else bytearray(4)
         word[lo - a:hi - a] = data[lo - address:hi - address]
         device.write(a, int.from_bytes(word, 'little'))
 
@@ -254,4 +281,6 @@ def check_ddr(device):
             raise RuntimeError(f'DDR ABI mismatch at {DDR_CSR + offset:#x}')
     status = device.read(DDR_CSR + 4)
     if status & 7 != 3:
-        raise RuntimeError(f'DDR is not calibrated/present or has a sticky fault: {status:#x}')
+        raise RuntimeError(
+            f'DDR is not calibrated/present or has a sticky fault: {status:#x}'
+        )

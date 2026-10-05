@@ -49,7 +49,9 @@ module coral_host (
     input wire m_rlast,
     input wire m_rvalid,
     output wire m_rready,
-    input wire ddr_ready, ddr_present, ddr_fault
+    input wire ddr_ready,
+    ddr_present,
+    ddr_fault
 );
 
   // Capture independent AXI-Lite address/data channels before widening WSTRB.
@@ -64,8 +66,8 @@ module coral_host (
   wire [1:0] core_bresp;
   wire n_awvalid = wr_busy && !aw_sent && !status_write;
   wire n_wvalid = wr_busy && !w_sent && !status_write;
-  assign s_bvalid = (wr_busy && status_write) || core_bvalid;
-  assign s_bresp = (wr_busy && status_write) ? 2'b11 : core_bresp;
+  assign s_bvalid  = (wr_busy && status_write) || core_bvalid;
+  assign s_bresp   = (wr_busy && status_write) ? 2'b11 : core_bresp;
   assign s_awready = !aw_full && !wr_busy;
   assign s_wready  = !w_full && !wr_busy;
   wire status_select = s_araddr[31:8] == 24'h000400;
@@ -75,9 +77,9 @@ module coral_host (
   wire core_rvalid;
   wire [1:0] core_rresp;
   assign s_arready = !rd_busy && (status_select || n_arready);
-  assign s_rvalid = status_pending || core_rvalid;
-  assign s_rresp = status_pending ? status_resp : core_rresp;
-  assign s_rdata = status_pending ? status_data : n_rdata[read_lane*32+:32];
+  assign s_rvalid  = status_pending || core_rvalid;
+  assign s_rresp   = status_pending ? status_resp : core_rresp;
+  assign s_rdata   = status_pending ? status_data : n_rdata[read_lane*32+:32];
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       aw_full <= 0;
@@ -123,15 +125,21 @@ module coral_host (
           status_resp <= 0;
           case (s_araddr[7:0])
             8'h00: status_data <= 32'h43444452;
-            8'h04: status_data <= {29'b0,ddr_fault,ddr_present,ddr_ready};
+            8'h04: status_data <= {29'b0, ddr_fault, ddr_present, ddr_ready};
             8'h08: status_data <= 32'h80000000;
             8'h0c: status_data <= 32'h20000000;
             8'h10: status_data <= 32'h00000001;
-            default: begin status_data <= 0; status_resp <= 2'b11; end
+            default: begin
+              status_data <= 0;
+              status_resp <= 2'b11;
+            end
           endcase
         end
       end
-      if (s_rvalid && s_rready) begin rd_busy <= 0; status_pending <= 0; end
+      if (s_rvalid && s_rready) begin
+        rd_busy <= 0;
+        status_pending <= 0;
+      end
     end
   end
 

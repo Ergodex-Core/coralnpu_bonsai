@@ -2,16 +2,26 @@
 #define CORAL_MODEL_FORMAT_H_
 /* CORALM01 v1: all fields little-endian; offsets relative to image start. */
 #include <stdint.h>
-#define CM_MAGIC "CORALM01"
-#define CM_VERSION 1u
+#define CM_MAGIC        "CORALM01"
+#define CM_VERSION      1u
 #define CM_GLOBAL_LAYER UINT32_C(0xffffffff)
 enum { CM_F32 = 1, CM_BF16 = 2, CM_PQ2_0 = 3 };
 enum { CM_TIED_EMBEDDINGS = 1, CM_QK_NORM = 2, CM_YARN = 4 };
 enum {
-  CM_EMBEDDING = 1, CM_FINAL_NORM = 2, CM_OUTPUT = 3,
-  CM_INPUT_NORM = 10, CM_Q = 11, CM_K = 12, CM_V = 13, CM_O = 14,
-  CM_Q_NORM = 15, CM_K_NORM = 16, CM_POSTATTN_NORM = 17,
-  CM_GATE = 18, CM_UP = 19, CM_DOWN = 20
+  CM_EMBEDDING     = 1,
+  CM_FINAL_NORM    = 2,
+  CM_OUTPUT        = 3,
+  CM_INPUT_NORM    = 10,
+  CM_Q             = 11,
+  CM_K             = 12,
+  CM_V             = 13,
+  CM_O             = 14,
+  CM_Q_NORM        = 15,
+  CM_K_NORM        = 16,
+  CM_POSTATTN_NORM = 17,
+  CM_GATE          = 18,
+  CM_UP            = 19,
+  CM_DOWN          = 20
 };
 typedef struct {
   char magic[8];

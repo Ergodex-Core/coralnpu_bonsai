@@ -25,7 +25,7 @@ subject to the actual DDR budget. No sliding window or KV eviction is implemente
 
 ## Build and test
 
-```
+```bash
 python3 fpga/aws/models/runtime/test_runtime.py
 python3 fpga/aws/models/runtime/build.py --output /tmp/coral-decoder-build \
   --clang clang-18 --linker ld.lld-18 \

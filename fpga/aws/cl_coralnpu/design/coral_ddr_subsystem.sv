@@ -1,6 +1,12 @@
 // Core 50 MHz AXI128 and host 250 MHz PCIS AXI512 share a bounded DDR aperture.
-module coral_ddr_subsystem #(parameter integer TIMEOUT_CYCLES=1048576) (
-    input wire core_clk, core_rst_n, host_clk, host_rst_n, ddr_ready,
+module coral_ddr_subsystem #(
+    parameter integer TIMEOUT_CYCLES = 1048576
+) (
+    input wire core_clk,
+    core_rst_n,
+    host_clk,
+    host_rst_n,
+    ddr_ready,
     output wire ddr_fault,
     input wire [31:0] c_awaddr,
     input wire [5:0] c_awid,
@@ -104,9 +110,13 @@ module coral_ddr_subsystem #(parameter integer TIMEOUT_CYCLES=1048576) (
   wire [31:0] c_req_addr;
   wire [511:0] c_req_wdata, c_rsp_rdata;
   wire [63:0] c_req_wstrb;
-  wire [1:0] c_rsp_resp;
-  coral_ddr_frontend #(.DATA_WIDTH(128), .ADDR_WIDTH(32), .ID_WIDTH(6),
-      .BASE_ADDR(64'h20000000)) i_c_frontend (
+  wire [ 1:0] c_rsp_resp;
+  coral_ddr_frontend #(
+      .DATA_WIDTH(128),
+      .ADDR_WIDTH(32),
+      .ID_WIDTH  (6),
+      .BASE_ADDR (64'h20000000)
+  ) i_c_frontend (
       .clk(core_clk),
       .rst_n(core_rst_n),
       .s_awaddr(c_awaddr),
@@ -151,8 +161,12 @@ module coral_ddr_subsystem #(parameter integer TIMEOUT_CYCLES=1048576) (
       .rsp_rdata(c_rsp_rdata),
       .rsp_resp(c_rsp_resp)
   );
-  coral_ddr_frontend #(.DATA_WIDTH(512), .ADDR_WIDTH(64), .ID_WIDTH(16),
-      .BASE_ADDR(64'h0)) i_h_frontend (
+  coral_ddr_frontend #(
+      .DATA_WIDTH(512),
+      .ADDR_WIDTH(64),
+      .ID_WIDTH  (16),
+      .BASE_ADDR (64'h0)
+  ) i_h_frontend (
       .clk(host_clk),
       .rst_n(host_rst_n),
       .s_awaddr(h_awaddr),
@@ -223,7 +237,9 @@ module coral_ddr_subsystem #(parameter integer TIMEOUT_CYCLES=1048576) (
       .s_rsp_resp(c_rsp_resp),
       .m_rsp_resp(rsp_resp)
   );
-  coral_ddr_backend #(.TIMEOUT_CYCLES(TIMEOUT_CYCLES)) i_backend (
+  coral_ddr_backend #(
+      .TIMEOUT_CYCLES(TIMEOUT_CYCLES)
+  ) i_backend (
       .clk(host_clk),
       .rst_n(host_rst_n),
       .ddr_ready(ddr_ready),

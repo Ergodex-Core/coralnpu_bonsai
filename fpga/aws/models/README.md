@@ -119,9 +119,8 @@ and omitted from the packed inventory. Bonsai has:
 197 PQ2 matrices and 113 FP32 norms, including packed embedding and no separate
 head. Its original GGUF is 463290464 bytes; tokenizer metadata stays on host.
 
-Workspace bytes are exactly `4*(3*dim + 2*n_heads*head_dim + 2*n_kv_heads*head_dim
-+ 2*hidden_dim + seq_capacity + head_dim/2 +
-2*n_layers*seq_capacity*n_kv_heads*head_dim)`. The final term is KV. After the
+Workspace bytes are exactly `4*(3*dim + 2*n_heads*head_dim + 2*n_kv_heads*head_dim + 2*hidden_dim + seq_capacity + head_dim/2 + 2*n_layers*seq_capacity*n_kv_heads*head_dim)`.
+The final term is KV. After the
 package, separately allocate the token buffer (`4*capacity`), logits and
 workspace, aligning each region to 64 bytes.
 
@@ -139,7 +138,6 @@ Packaging, independent operator fixtures, native CPU execution, full reference
 logits/tokens, cycle-accurate Coral simulation, routed timing, DDR hardware
 readback and physical generation are separate gates. Preserve NOT_RUN for
 missing evidence. Synthetic tokens do not establish real-model inference.
-
 
 ## CPU reference continuation
 

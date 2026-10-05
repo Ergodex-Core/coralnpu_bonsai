@@ -8,17 +8,20 @@ module coral_ddr_frontend #(
     parameter logic [63:0] BASE_ADDR = 64'h20000000,
     parameter logic [63:0] APERTURE_BYTES = 64'h80000000
 ) (
-    input wire clk, rst_n,
+    input wire clk,
+    rst_n,
     input wire [ADDR_WIDTH-1:0] s_awaddr,
     input wire [ID_WIDTH-1:0] s_awid,
     input wire [7:0] s_awlen,
     input wire [2:0] s_awsize,
     input wire [1:0] s_awburst,
-    input wire s_awlock, s_awvalid,
+    input wire s_awlock,
+    s_awvalid,
     output wire s_awready,
     input wire [DATA_WIDTH-1:0] s_wdata,
     input wire [DATA_WIDTH/8-1:0] s_wstrb,
-    input wire s_wlast, s_wvalid,
+    input wire s_wlast,
+    s_wvalid,
     output wire s_wready,
     output wire [ID_WIDTH-1:0] s_bid,
     output wire [1:0] s_bresp,
@@ -29,12 +32,14 @@ module coral_ddr_frontend #(
     input wire [7:0] s_arlen,
     input wire [2:0] s_arsize,
     input wire [1:0] s_arburst,
-    input wire s_arlock, s_arvalid,
+    input wire s_arlock,
+    s_arvalid,
     output wire s_arready,
     output wire [DATA_WIDTH-1:0] s_rdata,
     output wire [ID_WIDTH-1:0] s_rid,
     output wire [1:0] s_rresp,
-    output wire s_rlast, s_rvalid,
+    output wire s_rlast,
+    s_rvalid,
     input wire s_rready,
     output wire req_valid,
     input wire req_ready,
@@ -62,18 +67,15 @@ module coral_ddr_frontend #(
   logic [BUS_BYTES-1:0] legal_strobes;
   integer lane_shift;
 
-  function automatic logic bad_address(
-      input logic [ADDR_WIDTH-1:0] addr,
-      input logic [7:0] len,
-      input logic [2:0] size,
-      input logic [1:0] burst,
-      input logic locked);
+  function automatic logic bad_address(input logic [ADDR_WIDTH-1:0] addr, input logic [7:0] len,
+                                       input logic [2:0] size, input logic [1:0] burst,
+                                       input logic locked);
     logic [64:0] first_byte, final_byte, beat_bytes, offset;
     begin
       first_byte = {1'b0, 64'(addr)};
       beat_bytes = 65'd1 << size;
-      offset = first_byte - {1'b0,BASE_ADDR};
-      final_byte = first_byte + ((burst == 2'b01 ? (65'(len)+1) : 65'd1) << size) - 1;
+      offset = first_byte - {1'b0, BASE_ADDR};
+      final_byte = first_byte + ((burst == 2'b01 ? (65'(len) + 1) : 65'd1) << size) - 1;
       bad_address = locked || size > 3'(BUS_SIZE) || burst > 2'b01 ||
           (burst == 2'b00 && len > 15) ||
           ((first_byte & (beat_bytes-1)) != 0) ||
@@ -100,9 +102,9 @@ module coral_ddr_frontend #(
   assign rsp_ready = state == RESPONSE;
 
   always_comb begin
-    lane_shift = (32'(addr_q) & (64-BUS_BYTES)) * 8;
-    for (integer b = 0; b < BUS_BYTES; b = b+1)
-      legal_strobes[b] = b >= (32'(addr_q) & (BUS_BYTES-1)) &&
+    lane_shift = (32'(addr_q) & (64 - BUS_BYTES)) * 8;
+    for (integer b = 0; b < BUS_BYTES; b = b + 1)
+    legal_strobes[b] = b >= (32'(addr_q) & (BUS_BYTES-1)) &&
                         b < ((32'(addr_q) & (BUS_BYTES-1)) + (1 << size_q));
   end
 
@@ -120,83 +122,90 @@ module coral_ddr_frontend #(
       data_q <= 0;
       req_wdata <= 0;
       req_wstrb <= 0;
-    end else case (state)
-      IDLE: begin
-        if (s_awvalid && s_awready) begin
-          write_q <= 1;
-          addr_q <= s_awaddr;
-          id_q <= s_awid;
-          left_q <= s_awlen;
-          size_q <= s_awsize;
-          burst_q <= s_awburst;
-          resp_q <= bad_address(s_awaddr,s_awlen,s_awsize,s_awburst,s_awlock) ? 2'b11 : 2'b00;
-          state <= WRITE_DATA;
-        end else if (s_arvalid && s_arready) begin
-          write_q <= 0;
-          addr_q <= s_araddr;
-          id_q <= s_arid;
-          left_q <= s_arlen;
-          size_q <= s_arsize;
-          burst_q <= s_arburst;
-          data_q <= 0;
-          resp_q <= bad_address(s_araddr,s_arlen,s_arsize,s_arburst,s_arlock) ? 2'b11 : 2'b00;
-          state <= bad_address(s_araddr,s_arlen,s_arsize,s_arburst,s_arlock) ? READ_OUT : REQUEST;
-        end
-      end
-      WRITE_DATA: if (s_wvalid && s_wready) begin
-        if (s_wlast != (left_q == 0)) begin
-          // Malformed WLAST: never forward the offending beat. Early LAST
-          // ends with SLVERR; missing LAST drains until LAST before responding.
-          resp_q <= resp_q | 2'b10;
-          state <= s_wlast ? WRITE_OUT : WRITE_DRAIN;
-        end else if (resp_q != 0 || (s_wstrb & ~legal_strobes) != 0) begin
-          if ((s_wstrb & ~legal_strobes) != 0) resp_q <= resp_q | 2'b10;
-          if (left_q == 0) state <= WRITE_OUT;
-          else begin
-            left_q <= left_q - 1'b1;
-            if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
-          end
-        end else begin
-          req_wdata <= 512'(s_wdata) << lane_shift;
-          req_wstrb <= 64'(s_wstrb) << (lane_shift/8);
-          state <= REQUEST;
-        end
-      end
-      WRITE_DRAIN: if (s_wvalid && s_wready && s_wlast) state <= WRITE_OUT;
-      REQUEST: if (req_valid && req_ready) state <= RESPONSE;
-      RESPONSE: if (rsp_valid && rsp_ready) begin
-        if (write_q) begin
-          resp_q <= resp_q | rsp_resp;
-          if (left_q == 0) state <= WRITE_OUT;
-          else begin
-            left_q <= left_q - 1'b1;
-            if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
+    end else
+      case (state)
+        IDLE: begin
+          if (s_awvalid && s_awready) begin
+            write_q <= 1;
+            addr_q <= s_awaddr;
+            id_q <= s_awid;
+            left_q <= s_awlen;
+            size_q <= s_awsize;
+            burst_q <= s_awburst;
+            resp_q <= bad_address(s_awaddr, s_awlen, s_awsize, s_awburst, s_awlock) ? 2'b11 : 2'b00;
             state <= WRITE_DATA;
+          end else if (s_arvalid && s_arready) begin
+            write_q <= 0;
+            addr_q <= s_araddr;
+            id_q <= s_arid;
+            left_q <= s_arlen;
+            size_q <= s_arsize;
+            burst_q <= s_arburst;
+            data_q <= 0;
+            resp_q <= bad_address(s_araddr, s_arlen, s_arsize, s_arburst, s_arlock) ? 2'b11 : 2'b00;
+            state <= bad_address(
+                s_araddr, s_arlen, s_arsize, s_arburst, s_arlock
+            ) ? READ_OUT : REQUEST;
           end
-        end else begin
-          data_q <= DATA_WIDTH'(rsp_rdata >> lane_shift);
-          resp_q <= rsp_resp;
-          state <= READ_OUT;
         end
-      end
-      READ_OUT: if (s_rvalid && s_rready) begin
-        if (left_q == 0) begin
+        WRITE_DATA:
+        if (s_wvalid && s_wready) begin
+          if (s_wlast != (left_q == 0)) begin
+            // Malformed WLAST: never forward the offending beat. Early LAST
+            // ends with SLVERR; missing LAST drains until LAST before responding.
+            resp_q <= resp_q | 2'b10;
+            state  <= s_wlast ? WRITE_OUT : WRITE_DRAIN;
+          end else if (resp_q != 0 || (s_wstrb & ~legal_strobes) != 0) begin
+            if ((s_wstrb & ~legal_strobes) != 0) resp_q <= resp_q | 2'b10;
+            if (left_q == 0) state <= WRITE_OUT;
+            else begin
+              left_q <= left_q - 1'b1;
+              if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
+            end
+          end else begin
+            req_wdata <= 512'(s_wdata) << lane_shift;
+            req_wstrb <= 64'(s_wstrb) << (lane_shift / 8);
+            state <= REQUEST;
+          end
+        end
+        WRITE_DRAIN: if (s_wvalid && s_wready && s_wlast) state <= WRITE_OUT;
+        REQUEST: if (req_valid && req_ready) state <= RESPONSE;
+        RESPONSE:
+        if (rsp_valid && rsp_ready) begin
+          if (write_q) begin
+            resp_q <= resp_q | rsp_resp;
+            if (left_q == 0) state <= WRITE_OUT;
+            else begin
+              left_q <= left_q - 1'b1;
+              if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
+              state <= WRITE_DATA;
+            end
+          end else begin
+            data_q <= DATA_WIDTH'(rsp_rdata >> lane_shift);
+            resp_q <= rsp_resp;
+            state  <= READ_OUT;
+          end
+        end
+        READ_OUT:
+        if (s_rvalid && s_rready) begin
+          if (left_q == 0) begin
+            state <= IDLE;
+            prefer_write <= 1;
+          end else begin
+            left_q <= left_q - 1'b1;
+            if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
+            // Invalid address bursts remain DECERR with zero data throughout.
+            // Downstream faults are likewise terminal for the remaining burst.
+            state <= resp_q == 0 ? REQUEST : READ_OUT;
+            if (resp_q != 0) data_q <= 0;
+          end
+        end
+        WRITE_OUT:
+        if (s_bvalid && s_bready) begin
           state <= IDLE;
-          prefer_write <= 1;
-        end else begin
-          left_q <= left_q - 1'b1;
-          if (burst_q == 1) addr_q <= addr_q + (ADDR_WIDTH'(1) << size_q);
-          // Invalid address bursts remain DECERR with zero data throughout.
-          // Downstream faults are likewise terminal for the remaining burst.
-          state <= resp_q == 0 ? REQUEST : READ_OUT;
-          if (resp_q != 0) data_q <= 0;
+          prefer_write <= 0;
         end
-      end
-      WRITE_OUT: if (s_bvalid && s_bready) begin
-        state <= IDLE;
-        prefer_write <= 0;
-      end
-      default: state <= IDLE;
-    endcase
+        default: state <= IDLE;
+      endcase
   end
 endmodule

@@ -87,7 +87,8 @@ def source_check():
     require(".BUFGCE_DIVIDE(5)" in wrapper, "Unexpected NPU divider")
     require(
         "parameter EN_DDR = 1" in wrapper
-        and "parameter EN_HBM = 0" in wrapper, "Expected DDR enabled / HBM disabled configuration"
+        and "parameter EN_HBM = 0" in wrapper,
+        "Expected DDR enabled / HBM disabled configuration"
     )
     require(
         "cl_axi_clock_converter_light i_host_cdc" in wrapper,
@@ -101,12 +102,17 @@ def source_check():
         "`ifdef SYNTHESIS" in (REPO / "hdl/verilog/Sram.v").read_text(),
         "Synthesizable SRAM branch missing"
     )
-    require(PINS["ddr_enabled"] and not PINS["hbm_enabled"], "Memory enable pins differ")
-    require(PINS["ddr_cpu_base"] == 0x20000000 and
-            PINS["ddr_aperture_bytes"] == 0x80000000 and
-            PINS["ddr_axi_data_bits"] == 512 and
-            PINS["ddr_axi_clock_hz"] == PINS["shell_clock_hz"],
-            "DDR address/width/clock pins differ")
+    require(
+        PINS["ddr_enabled"] and not PINS["hbm_enabled"],
+        "Memory enable pins differ"
+    )
+    require(
+        PINS["ddr_cpu_base"] == 0x20000000
+        and PINS["ddr_aperture_bytes"] == 0x80000000
+        and PINS["ddr_axi_data_bits"] == 512
+        and PINS["ddr_axi_clock_hz"] == PINS["shell_clock_hz"],
+        "DDR address/width/clock pins differ"
+    )
     subprocess.run([
         sys.executable, "-m", "unittest", "discover", "-s",
         str(HERE), "-p", "test_*.py"
@@ -448,14 +454,21 @@ def build(args, out):
 
     def simulate_ddr():
         # A missing simulator must not silently turn unittest SKIP into proof.
-        require(shutil.which("iverilog") and shutil.which("vvp"),
-                "DDR protocol qualification requires iverilog and vvp")
+        require(
+            shutil.which("iverilog") and shutil.which("vvp"),
+            "DDR protocol qualification requires iverilog and vvp"
+        )
         manifest["ddr_simulation_tools"] = {
-            name: capture([name, "-V"]) for name in ("iverilog", "vvp")
+            name: capture([name, "-V"])
+            for name in ("iverilog", "vvp")
         }
-        run([sys.executable, "-m", "unittest", "discover", "-s",
-             str(AWS / "ddr/sim"), "-p", "test_*.py", "-v"],
-            out / "logs/ddr-simulation.log", cwd=REPO, timeout=300)
+        run([
+            sys.executable, "-m", "unittest", "discover", "-s",
+            str(AWS / "ddr/sim"), "-p", "test_*.py", "-v"
+        ],
+            out / "logs/ddr-simulation.log",
+            cwd=REPO,
+            timeout=300)
 
     stage("ddr_simulation", simulate_ddr)
     for name, flow in (("synthesis", "SynthCL"), ("implementation", "ImplCL")):

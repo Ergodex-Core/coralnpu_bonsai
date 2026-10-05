@@ -250,10 +250,12 @@ module cl_coralnpu #(
   wire ddr_ready, ddr_fault;
   (* ASYNC_REG="TRUE" *) logic [2:0] ddr_ready_sync, ddr_fault_sync;
   always_ff @(posedge npu_clk or negedge rst_main_n)
-    if (!rst_main_n) begin ddr_ready_sync <= 0; ddr_fault_sync <= 0; end
-    else begin
-      ddr_ready_sync <= {ddr_ready_sync[1:0],ddr_ready};
-      ddr_fault_sync <= {ddr_fault_sync[1:0],ddr_fault};
+    if (!rst_main_n) begin
+      ddr_ready_sync <= 0;
+      ddr_fault_sync <= 0;
+    end else begin
+      ddr_ready_sync <= {ddr_ready_sync[1:0], ddr_ready};
+      ddr_fault_sync <= {ddr_fault_sync[1:0], ddr_fault};
     end
   coral_host i_npu (
       .clk(npu_clk),

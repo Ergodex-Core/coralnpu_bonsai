@@ -10,6 +10,7 @@ DESIGN = HERE.parents[1] / "cl_coralnpu" / "design"
 
 
 class RTLTest(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         if not shutil.which("iverilog") or not shutil.which("vvp"):
@@ -22,24 +23,49 @@ class RTLTest(unittest.TestCase):
             command += [f"-D{value}" for value in defines]
             command += [f"-P{top}.{key}={value}" for key, value in parameters]
             command += [str(path) for path in sources]
-            compiled = subprocess.run(command, capture_output=True, text=True, timeout=60)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run(["vvp", str(exe)], capture_output=True, text=True, timeout=60)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            compiled = subprocess.run(
+                command, capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(
+                compiled.returncode, 0, compiled.stdout + compiled.stderr
+            )
+            result = subprocess.run(["vvp", str(exe)],
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=60)
+            self.assertEqual(
+                result.returncode, 0, result.stdout + result.stderr
+            )
             self.assertIn("PASS:", result.stdout)
             return result.stdout
 
     def test_core_frontend_128(self):
-        self.simulate("tb_ddr_frontend", [DESIGN / "coral_ddr_frontend.sv", HERE / "tb_ddr_frontend.sv"])
+        self.simulate(
+            "tb_ddr_frontend",
+            [DESIGN / "coral_ddr_frontend.sv", HERE / "tb_ddr_frontend.sv"]
+        )
 
     def test_pcis_frontend_512(self):
-        self.simulate("tb_ddr_frontend", [DESIGN / "coral_ddr_frontend.sv", HERE / "tb_ddr_frontend.sv"], [("DATA_WIDTH", 512), ("ADDR_WIDTH", 64), ("ID_WIDTH", 16), ("BASE_ADDR", 0)])
+        self.simulate(
+            "tb_ddr_frontend",
+            [DESIGN / "coral_ddr_frontend.sv", HERE / "tb_ddr_frontend.sv"],
+            [("DATA_WIDTH", 512), ("ADDR_WIDTH", 64), ("ID_WIDTH", 16),
+             ("BASE_ADDR", 0)]
+        )
 
     def test_backend(self):
-        self.simulate("tb_ddr_backend", [DESIGN / "coral_ddr_backend.sv", HERE / "tb_ddr_backend.sv"])
+        self.simulate(
+            "tb_ddr_backend",
+            [DESIGN / "coral_ddr_backend.sv", HERE / "tb_ddr_backend.sv"]
+        )
 
     def test_cdc(self):
-        self.simulate("tb_ddr_cdc", [HERE / "xpm_fifo_async_model.sv", DESIGN / "coral_ddr_cdc.sv", HERE / "tb_ddr_cdc.sv"])
+        self.simulate(
+            "tb_ddr_cdc", [
+                HERE / "xpm_fifo_async_model.sv", DESIGN / "coral_ddr_cdc.sv",
+                HERE / "tb_ddr_cdc.sv"
+            ]
+        )
 
 
 if __name__ == "__main__":
