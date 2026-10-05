@@ -1,0 +1,47 @@
+{
+  "scope": "Cloud source integration; no licensed build or FPGA operation",
+  "unit_tests": {
+    "command": "hbm-check-tools/bin/python -m unittest discover -s fpga/ayush_hbm/ci -p test_*.py -v",
+    "passed": 35,
+    "failed": 0
+  },
+  "source_dry_run": "PASS",
+  "original_handoff_manifest": "39 of 39 entries verified before adaptation",
+  "python_format": "PASS (YAPF 0.43.0, repository configuration)",
+  "shellcheck": "PASS (0.10.0, repository configuration)",
+  "bash_syntax": "PASS",
+  "macro_signatures": "PASS",
+  "whitespace": "PASS except byte-preserved AWS-HDK-LICENSE.txt legacy whitespace",
+  "aggregate_repository_linters": {
+    "status": "BLOCKED_MISSING_TOOLS_AND_VENDOR_MACRO",
+    "command": "utils/run_linters.sh --no-lockfile fpga/ayush_hbm",
+    "missing": [
+      "buildifier",
+      "mdl"
+    ],
+    "format_exception": "cl_hbm_wrapper.sv (upstream macro parser limitation)"
+  },
+  "elf_source_build": "NOT_RUN: LLVM 18.1.3 is not installed in this environment",
+  "fixture_dependent_loader_test": "NOT_RUN: requires the source-built ELF",
+  "real_rtl_generation": "NOT_RUN",
+  "rtl_simulation": "NOT_RUN",
+  "vivado_fabric_simulation": "NOT_RUN",
+  "licensed_synthesis_route": "NOT_RUN",
+  "live_report_parser_qualification": "NOT_RUN: unit reports are synthetic",
+  "hardware_calibration": "NOT_RUN",
+  "physical_inference": "NOT_RUN",
+  "retained_tar_reproduction": "NOT_PROVEN",
+  "verible_format": {
+    "status": "PARTIAL",
+    "version": "v0.0-4296-g0f262651",
+    "checked_source_files": 8,
+    "exception": "Byte-retained cl_hbm_wrapper.sv uses CONNECT_HBM_APB_MON macros the formatter cannot parse; no new RTL syntax qualification is claimed"
+  },
+  "blacksmith_ci": {
+    "local_workflow_lint": "PASS: actionlint 1.7.12; official Linux amd64 archive SHA256 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+    "pinned_wheel_install": "PASS: isolated Python 3.12 venv, require-hashes, binary-only, no-deps",
+    "remote_execution": "NOT_RUN during local validation; inspect exact published SHA",
+    "licensed_gate": "BLOCKED: HBM_TRUSTED_PROFILE_MISSING",
+    "live_builder_qualification": "NOT_RUN"
+  }
+}

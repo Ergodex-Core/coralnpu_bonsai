@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "status": "HBM_TRUSTED_PROFILE_MISSING",
+  "inspected_pr1_commit": "a0d2387e804515e9a94575a20443ca378c4e542e",
+  "inspected_files_sha256": {
+    ".github/workflows/fpga.yml": "097467d67e3442bfa42daf14a21fecc36a81cf37bf6d85fbce5fab6518f39386",
+    ".github/workflows/fpga-ci-controller.yml": "2e5a1608d19a3dbf5bc1d5e3991b494e60bb85cefa77992a4b3622428f8453b1",
+    "fpga/aws/ci/protocol.py": "9c07bddab83b56b1b58099a94cb5c5810473f6509a017040eb427cccf8c8c572",
+    "fpga/aws/ci/orchestrator/eligibility.py": "ec85f00f2add21a1c2b271d94b23e58d38efa653b7e76cd278dbaa5d5d539f7d",
+    "fpga/aws/ci/image/entrypoint.py": "7f9442844b05c011385f507189b8a812136dc33b00e47f040611a44b84ae5959"
+  },
+  "existing_runtime_profile": "on-chip/H2 only",
+  "hbm_dispatch_supported": false,
+  "live_builder_probed": false,
+  "source_workflow": ".github/workflows/ayush-hbm.yml",
+  "source_job": "HBM source and policy checks",
+  "required_profile": {
+    "hbm_bytes": 17179869184,
+    "ddr_enabled": false,
+    "hbm_recipe": "H3",
+    "hbm_axi_mhz": 300,
+    "npu_mhz": 50,
+    "shell_mhz": 250,
+    "bus_skew_constraints": 43
+  },
+  "missing": [
+    "Reviewed immutable HBM runtime and qualification policy in the existing trusted controller",
+    "Fresh GitHub exact-PR-head eligibility binding for this source workflow/job",
+    "Explicit source and template revision contract for changed Coral interfaces",
+    "Approved isolated licensed builder, identity/permissions and artifact transfer",
+    "Live report parser qualification and independent hardware evidence"
+  ],
+  "activation_configuration": false
+}
