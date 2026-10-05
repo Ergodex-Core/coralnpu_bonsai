@@ -90,19 +90,19 @@ static inline int cm_q8_matvec(float *out, const unsigned char *weights,
                               uint32_t rows, uint32_t cols, const float *x) {
   if (!cols || cols % 32) return 0;
   uint32_t stride = cols / 32 * 34;
-  /* Bounded local storage:32 accumulators + one activation/weight block.
-   * Reuse each activation quantization across32 output rows. */
+  /* Bounded local storage:32 accumulators + one activation block. RVV loads
+   * packed weights directly into registers from the external window, avoiding
+   * scalar byte-copy traffic. Reuse activation quantization across32 rows. */
   for (uint32_t first = 0; first < rows; first += 32) {
     uint32_t n = rows - first; if (n > 32) n = 32;
-    float sums[32] = {0}; unsigned char activation[34], weight[34];
+    float sums[32] = {0}; unsigned char activation[34];
     for (uint32_t col = 0; col < cols; col += 32) {
       if (!cm_q8_quant32(activation, x + col)) return 0;
       float ds = cm_q8_scale(activation);
       for (uint32_t r = 0; r < n; ++r) {
         const unsigned char *w = weights + (first + r) * stride + col / 32 * 34;
-        for (unsigned j = 0; j < 34; ++j) weight[j] = w[j];
-        float scale = cm_q8_scale(weight) * ds;
-        float value = (float)cm_q8_dot32(weight + 2, activation + 2) * scale;
+        float scale = cm_q8_scale(w) * ds;
+        float value = (float)cm_q8_dot32(w + 2, activation + 2) * scale;
         sums[r] += value;
       }
     }

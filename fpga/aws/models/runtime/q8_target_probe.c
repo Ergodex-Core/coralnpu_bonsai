@@ -9,9 +9,17 @@
 volatile uint32_t q8_probe_seed = 19;
 volatile uint32_t q8_probe_result[8] = {0x51385031u, 0, 0, 0, 0, 0, 0, 0};
 /* Satisfies existing model linker mailbox reservation, unused by this probe. */
-volatile unsigned char q8_probe_mailbox[128] __attribute__((section(".mailbox"), aligned(64)));
-static unsigned char weights[33 * 2 * 34], a[32], b[32], quant[34];
+volatile unsigned char coral_mailbox[128] __attribute__((section(".mailbox"), aligned(64)));
+/* The linked HBM probe exercises vector reads from the external window. */
+static unsigned char weights[33 * 2 * 34] __attribute__((section(".q8_probe_data"), aligned(64)));
+static unsigned char a[32], b[32], quant[34];
 static float input[64], output[33];
+void __cxa_finalize(void) {}
+#ifdef __riscv
+__attribute__((naked)) void coralnpu_exception_handler(void) {
+  __asm__ volatile("ebreak\n1: j 1b");
+}
+#endif
 void *memset(void *dst, int value, size_t n) {
   unsigned char *p = dst;
   for (size_t i = 0; i < n; ++i) p[i] = (unsigned char)value;
@@ -29,6 +37,9 @@ static int fail(unsigned stage, int observed, int expected) {
   return 1;
 }
 int main(void) {
+#ifdef __riscv
+  __asm__ volatile("csrwi fcsr, 0" ::: "memory");
+#endif
   q8_probe_result[1] = 1;
   for (unsigned i = 0; i < 32; ++i) a[i] = b[i] = 128;
   int dot = cm_q8_dot32(a, b);
@@ -48,6 +59,9 @@ int main(void) {
       for (unsigned j = 0; j < 32; ++j) w[j+2] = (unsigned char)(seed + r + j*3 + block*7);
     }
   }
+#ifdef __riscv
+  __asm__ volatile("fence rw, rw" ::: "memory");
+#endif
   if (!cm_q8_matvec(output, weights, 33, 64, input)) return fail(6, 0, 1);
   for (unsigned r = 0; r < 33; ++r) {
     float expected = 0;

@@ -15,6 +15,8 @@ static int fail(int error) {
   return error;
 }
 int main(void) {
+  /* All FP32 and activation-quantization contracts require RNE. */
+  __asm__ volatile("csrwi fcsr, 0" ::: "memory");
   volatile cm_mailbox *m = &coral_mailbox;
   if (m->magic != CM_MAILBOX_MAGIC || m->abi_version != 2 || m->reserved[0] || m->reserved[1])
     return fail(CM_BAD_REQUEST);

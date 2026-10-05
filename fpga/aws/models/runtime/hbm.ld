@@ -13,6 +13,7 @@ SECTIONS {
   .boot : ALIGN(16) { KEEP(*(._init)) . = ALIGN(16); } > ITCM
   .text : ALIGN(16) { *(.text .text.*) *(.crt) . = ALIGN(16); } > DDR
   .rodata : ALIGN(16) { *(.srodata .srodata.* .rodata .rodata.*) . = ALIGN(16); } > DDR
+  .q8_probe_data : ALIGN(64) { *(.q8_probe_data) . = ALIGN(64); } > DDR
   .init_array : ALIGN(4) {
     __init_array_start__ = .; KEEP(*(.init_array .init_array.*)) __init_array_end__ = .;
   } > DDR

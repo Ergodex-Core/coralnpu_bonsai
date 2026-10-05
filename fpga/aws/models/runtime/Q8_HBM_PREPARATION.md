@@ -35,9 +35,10 @@ Target owner integration requirements:
 1. For HBM, pair hbm.ld with -DCM_HBM_PROFILE. For integer RVV, additionally use
    -DCM_Q8_RVV with the existing rv32imf_zicsr_zifencei_zve32f_zvl128b / ilp32f
    flags and -ffp-contract=off -fno-fast-math. No target build was performed here.
-2. Extend the owner's ELF/host loader for the supplied HBM ABI before running.
-   Existing build.py still validates through the old DDR ElfImage loader; it is
-   not an HBM build entrypoint. Preserve strict LLVM18.1.3 provenance and check
+2. build.py now accepts --memory-profile hbm --q8-rvv and optionally --probe.
+   It validates through fpga/aws/hbm/host/elf_image_hbm.py. The matching HBM
+   run_inference.py preserves strict3e-5 output checking and halt/drain guards.
+   Preserve strict LLVM18.1.3 provenance and check
    vector loads, widening multiply/reduction, no unsupported ISA, no FMA, stack,
    DTCM usage, and no unresolved freestanding helpers in final disassembly.
 3. NPU external bank is [0x80000000,0x100000000). PF0 BAR4 offset is
