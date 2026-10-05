@@ -323,6 +323,9 @@ def collect_artifacts(
     routine also supports dependency-injected offline tests. Files created here
     are private and exclusive; nothing already in the inbox is overwritten.
     Only the trusted supervisor supplies qualified; failure copies evidence only.
+    All sources are reread once after copying the full set, under the same byte
+    limits and deadline, to detect content rewrites even when stat timestamps do
+    not change. This consistency check does not replace stopping all writers.
     """
     if (type(deadline) not in (int, float) or not math.isfinite(deadline)
             or type(chunk_size) is not int
@@ -414,8 +417,29 @@ def collect_artifacts(
                 }
             finally:
                 os.close(target_fd)
-        # Recheck both sources after the whole copy, not only the first artifact.
+        # Rehash the whole set after copying every artifact. Metadata alone
+        # can miss a same-size rewrite within one filesystem timestamp tick,
+        # and an immediate per-file rehash misses earlier-file changes while
+        # later files copy. One extra bounded pass is allowed; no retry loops.
         for name, limit, fd, before in sources:
+            check()
+            _stable(source_dir_fd, name, fd, before, limit=limit)
+            os.lseek(fd, 0, os.SEEK_SET)
+            digest = hashlib.sha256()
+            remaining = before.st_size
+            while remaining:
+                check()
+                block = os.read(fd, min(chunk_size, remaining))
+                check()
+                if not block:
+                    raise FileBoundaryError("source shortened during recheck")
+                digest.update(block)
+                remaining -= len(block)
+            check()
+            extra = os.read(fd, 1)
+            check()
+            if extra or digest.hexdigest() != result[name]["sha256"]:
+                raise FileBoundaryError("source contents changed during copy")
             _stable(source_dir_fd, name, fd, before, limit=limit)
         _directory(source_dir_fd, identity=_identity(source))
         _directory(inbox_dir_fd, private=True, identity=_identity(inbox))

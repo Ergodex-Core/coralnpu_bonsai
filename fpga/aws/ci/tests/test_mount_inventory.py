@@ -166,6 +166,7 @@ class MountInventoryTests(unittest.TestCase):
         (self.source / "alias").symlink_to("tool-link")
         (self.source / "bin/data-link").symlink_to("../data")
         self.mount = self.write_proof(self.manifest())
+        self.mask_timestamp_changes()
         result = self.verify()
         self.assertTrue(result["verified"])
         self.assertEqual(result["files"], 2)
@@ -299,7 +300,18 @@ class MountInventoryTests(unittest.TestCase):
             self.verify()
         self.assertEqual(self.fs.opened, [])
 
+    def mask_timestamp_changes(self):
+        # Model Linux metadata that remains unchanged within one timestamp tick.
+        real_lstat, real_fstat = self.fs.lstat, self.fs.fstat
+        self.fs.lstat = lambda parent, name: changed_stat(
+            real_lstat(parent, name), st_mtime_ns=0, st_ctime_ns=0
+        )
+        self.fs.fstat = lambda fd: changed_stat(
+            real_fstat(fd), st_mtime_ns=0, st_ctime_ns=0
+        )
+
     def test_mutation_during_file_read_rejected(self):
+        self.mask_timestamp_changes()
         changed = False
 
         def mutate(name, data):
@@ -313,6 +325,72 @@ class MountInventoryTests(unittest.TestCase):
         with self.assertRaises(inventory.InventoryError):
             self.verify()
         self.assertTrue(changed)
+
+    def test_earlier_file_rewrite_during_later_read_rejected(self):
+        self.mask_timestamp_changes()
+        first_path = None
+        changed = False
+
+        def mutate(name, data):
+            nonlocal first_path, changed
+            if not data or name not in {"data", "tool"}:
+                return
+            path = self.source / ("bin/tool" if name == "tool" else "data")
+            if first_path is None:
+                first_path = path
+            elif path != first_path and not changed:
+                changed = True
+                first_path.write_bytes(b"x" * first_path.stat().st_size)
+
+        self.fs.after_read = mutate
+        with self.assertRaises(inventory.InventoryError):
+            self.verify()
+        self.assertTrue(changed)
+
+    def test_content_reverification_reads_at_most_two_file_passes(self):
+        counts = {"tool": 0, "data": 0}
+
+        def count(name, data):
+            if name in counts:
+                counts[name] += len(data)
+
+        self.fs.after_read = count
+        self.verify()
+        self.assertEqual(
+            counts, {
+                "tool": 2 * self.proof["entries"]["bin/tool"]["bytes"],
+                "data": 2 * self.proof["entries"]["data"]["bytes"]
+            }
+        )
+
+    def test_deadline_also_bounds_second_content_pass(self):
+        real_open = self.fs.open_file
+        opens = 0
+        expired = False
+
+        def opening(parent, name):
+            nonlocal opens
+            if name == "tool":
+                opens += 1
+            return real_open(parent, name)
+
+        def expire_during_second_read(name, data):
+            nonlocal expired
+            if name == "tool" and opens == 2 and data:
+                expired = True
+
+        self.fs.open_file = opening
+        self.fs.after_read = expire_during_second_read
+        with self.assertRaises(TimeoutError):
+            inventory.verify_mount(
+                self.mount,
+                proof_directory="/proofs",
+                fs=self.fs,
+                expected_owner_uid=self.uid,
+                deadline=900,
+                clock=lambda: 900 if expired else 0
+            )
+        self.assertTrue(expired)
 
     def test_expired_deadline_opens_nothing(self):
         with self.assertRaises(TimeoutError):

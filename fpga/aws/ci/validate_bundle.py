@@ -80,6 +80,11 @@ def activation_errors(config):
         errors.append(
             "private engine sockets differ from fixed reviewed paths"
         )
+    if config.get("staging_network_qualification_path"
+                  ) != "/etc/coralnpu-ci/staging-network.json":
+        errors.append(
+            "staging network proof path differs from fixed reviewed path"
+        )
     return errors
 
 

@@ -420,7 +420,11 @@ def verify_mount(
 
     deadline uses the injected monotonic clock; omission permits 15 minutes. The
     caller must enforce its independent overall runtime bound for blocked I/O.
-    No hash cache is trusted: every reviewed regular file is streamed each time.
+    No hash cache is trusted: every reviewed regular file is streamed twice,
+    in two whole-inventory passes, under the same deadline and byte bounds.
+    Unchanged timestamps are not evidence that contents stayed unchanged. This
+    detects observed rewrites, but does not replace the root scheduling lock or
+    the requirement that reviewed snapshots have no concurrent writers.
     """
     if (not isinstance(mount, dict)
             or set(mount) != {"source", "target", "qualification_sha256"}
@@ -465,15 +469,19 @@ def verify_mount(
             fs, source_fd, entries, expected_owner_uid,
             proof["identity"]["device"], check
         )
-        for path, entry in entries.items():
-            if entry["kind"] == "file":
-                _hash_file(fs, source_fd, path, entry, signatures, check)
-        # Detect mutation of an earlier file or directory while another hashes.
-        if _scan(fs, source_fd, entries, expected_owner_uid,
-                 proof["identity"]["device"], check) != signatures:
-            raise InventoryError(
-                "snapshot changed across full inventory verification"
-            )
+        # Two whole-inventory passes catch a same-timestamp rewrite of an
+        # earlier file while a later file is hashed. Both compare to the pinned
+        # manifest; no timestamp granularity or hash cache is trusted. Reads
+        # remain bounded to twice the admitted total plus one EOF byte/file/pass.
+        for _ in range(2):
+            for path, entry in entries.items():
+                if entry["kind"] == "file":
+                    _hash_file(fs, source_fd, path, entry, signatures, check)
+            if _scan(fs, source_fd, entries, expected_owner_uid,
+                     proof["identity"]["device"], check) != signatures:
+                raise InventoryError(
+                    "snapshot changed across full inventory verification"
+                )
         # Reopen through the trusted absolute source path to detect replacement
         # of the source directory while its old FD remained valid.
         reopened = fs.open_source(mount["source"], owner=expected_owner_uid)

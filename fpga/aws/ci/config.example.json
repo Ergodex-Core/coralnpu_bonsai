@@ -62,5 +62,6 @@
   "docker_socket": "unix:///run/coralnpu-ci/docker.sock",
   "containerd_socket": "/run/coralnpu-ci/containerd.sock",
   "private_engine_verified": false,
-  "staging_network_verified": false
+  "staging_network_verified": false,
+  "staging_network_qualification_path": "/etc/coralnpu-ci/staging-network.json"
 }

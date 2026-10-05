@@ -1,15 +1,37 @@
 """Offline rejection tests; no host service, device, mount, or AWS operations."""
+from contextlib import contextmanager
 import hashlib
 import os
 from pathlib import Path
 import stat
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "host"))
 import secure_files as sf
+
+
+@contextmanager
+def unchanged_timestamps():
+    """Keep real identity/mode/size but model a same-tick Linux rewrite."""
+    real_stat, real_fstat = os.stat, os.fstat
+
+    def coarse(info):
+        fields = {
+            name: getattr(info, name)
+            for name in (
+                "st_dev", "st_ino", "st_mode", "st_uid", "st_gid", "st_nlink",
+                "st_size"
+            )
+        }
+        return SimpleNamespace(**fields, st_mtime_ns=0, st_ctime_ns=0)
+
+    with mock.patch.object(sf.os, "stat", side_effect=lambda *a, **kw: coarse(real_stat(*a, **kw))), \
+            mock.patch.object(sf.os, "fstat", side_effect=lambda fd: coarse(real_fstat(fd))):
+        yield
 
 
 class FileFixture(unittest.TestCase):
@@ -198,7 +220,8 @@ class ArtifactTests(FileFixture):
 
     def test_fixed_opaque_files_hashes_sizes_and_modes(self):
         (self.source / "ignored.sh").write_text("must not run")
-        result = self.collect(chunk_size=7)
+        with unchanged_timestamps():
+            result = self.collect(chunk_size=7)
         self.assertEqual(set(result), set(self.payloads))
         self.assertEqual(
             set(path.name for path in self.inbox.iterdir()),
@@ -317,11 +340,122 @@ class ArtifactTests(FileFixture):
                 (self.source / "checkpoint.tar").write_bytes(
                     self.payloads["checkpoint.tar"]
                 )
-                with mock.patch.object(sf.os, "read",
-                                       side_effect=mutating_read):
-                    with self.assertRaises(sf.FileBoundaryError):
-                        self.collect(chunk_size=8)
-                self.assertEqual(list(self.inbox.iterdir()), [])
+                try:
+                    with unchanged_timestamps(), mock.patch.object(
+                            sf.os, "read", side_effect=mutating_read):
+                        with self.assertRaises(sf.FileBoundaryError):
+                            self.collect(chunk_size=8)
+                    self.assertEqual(list(self.inbox.iterdir()), [])
+                finally:
+                    # Keep later subtests independent if a regression wrongly
+                    # accepts this copy and leaves output behind.
+                    for path in self.inbox.iterdir():
+                        path.unlink()
+
+    def test_earlier_source_rewrite_while_copying_later_file_rejected(self):
+        real_read = os.read
+        evidence_inode = (self.source / "evidence.tar").stat().st_ino
+        changed = False
+
+        def mutate(fd, count):
+            nonlocal changed
+            block = real_read(fd, count)
+            if block and os.fstat(fd).st_ino == evidence_inode and not changed:
+                changed = True
+                (self.source / "checkpoint.tar").write_bytes(
+                    b"X" * len(self.payloads["checkpoint.tar"])
+                )
+            return block
+
+        with unchanged_timestamps(), mock.patch.object(sf.os, "read",
+                                                       side_effect=mutate):
+            with self.assertRaises(sf.FileBoundaryError):
+                self.collect(chunk_size=8)
+        self.assertTrue(changed)
+        self.assertEqual(list(self.inbox.iterdir()), [])
+
+    def test_second_content_pass_is_bounded_and_deadline_checked(self):
+        real_read, real_seek = os.read, os.lseek
+        bytes_read = 0
+        largest_read = 0
+
+        def count(fd, size):
+            nonlocal bytes_read, largest_read
+            block = real_read(fd, size)
+            bytes_read += len(block)
+            largest_read = max(largest_read, size)
+            return block
+
+        with mock.patch.object(sf.os, "read", side_effect=count):
+            self.collect(chunk_size=8)
+        self.assertEqual(bytes_read, 2 * sum(map(len, self.payloads.values())))
+        self.assertLessEqual(largest_read, 8)
+        for path in self.inbox.iterdir():
+            path.unlink()
+        expired = False
+        rechecking = False
+
+        def rewind(fd, offset, whence):
+            nonlocal rechecking
+            rechecking = True
+            return real_seek(fd, offset, whence)
+
+        def expire_during_read(fd, size):
+            nonlocal expired
+            block = real_read(fd, size)
+            if rechecking and block:
+                expired = True
+            return block
+
+        with mock.patch.object(sf.os, "lseek", side_effect=rewind), \
+                mock.patch.object(sf.os, "read", side_effect=expire_during_read):
+            with self.assertRaises(TimeoutError):
+                sf.collect_artifacts(
+                    self.source_fd,
+                    self.inbox_fd,
+                    deadline=10,
+                    clock=lambda: 10 if expired else 0,
+                    chunk_size=8
+                )
+        self.assertTrue(expired)
+        self.assertEqual(list(self.inbox.iterdir()), [])
+
+    def test_recheck_failure_preserves_unrelated_and_replaced_destinations(
+        self
+    ):
+        real_read, real_seek = os.read, os.lseek
+        sentinel = self.inbox / "unrelated"
+        sentinel.write_bytes(b"keep unrelated")
+        replaced = self.inbox / "checkpoint.tar"
+        rechecking = False
+        changed = False
+
+        def rewind(fd, offset, whence):
+            nonlocal rechecking
+            rechecking = True
+            return real_seek(fd, offset, whence)
+
+        def mutate(fd, size):
+            nonlocal changed
+            block = real_read(fd, size)
+            if rechecking and block and not changed:
+                changed = True
+                replaced.rename(self.inbox / "original-checkpoint")
+                replaced.write_bytes(b"keep replacement inode")
+                (self.source / "checkpoint.tar").write_bytes(
+                    b"X" * len(self.payloads["checkpoint.tar"])
+                )
+            return block
+
+        with unchanged_timestamps(), \
+                mock.patch.object(sf.os, "lseek", side_effect=rewind), \
+                mock.patch.object(sf.os, "read", side_effect=mutate):
+            with self.assertRaises(sf.FileBoundaryError):
+                self.collect(chunk_size=8)
+        self.assertTrue(changed)
+        self.assertEqual(sentinel.read_bytes(), b"keep unrelated")
+        self.assertEqual(replaced.read_bytes(), b"keep replacement inode")
+        self.assertFalse((self.inbox / "evidence.tar").exists())
 
     def test_short_writes_supported_and_zero_write_rejected(self):
         real_write = os.write
