@@ -1,0 +1,155 @@
+name: AWS F2 FPGA PR build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fpga-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-checks:
+    name: FPGA source and host-test checks
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Validate build inputs and gates
+        run: python3 fpga/aws/build/build.py --source-check
+      - name: Test the BAR0 runner and ELF validation
+        run: python3 -m unittest discover -s fpga/aws/tests -p 'test_*.py' -v
+      - name: Install hash-pinned SDK for isolated adapter tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/fpga-ci-sdk"
+          "$RUNNER_TEMP/fpga-ci-sdk/bin/python" -m pip --isolated --disable-pip-version-check install --require-hashes --only-binary=:all: --no-deps -r fpga/aws/ci/requirements-controller.lock
+      - name: Test the fixed controller and host adapters without AWS access
+        run: '"$RUNNER_TEMP/fpga-ci-sdk/bin/python" -m unittest discover -s fpga/aws/ci/tests -p "test_*.py" -v'
+      - name: Test immutable image entrypoints without building an image
+        run: python3 fpga/aws/ci/image/test_entrypoint.py
+      - name: Check simulation macro signatures
+        run: python3 utils/check_macro_signatures.py
+
+  readiness:
+    name: FPGA backend routing and readiness
+    needs: source-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      enabled: ${{ steps.readiness.outputs.enabled }}
+      backend: ${{ steps.readiness.outputs.backend }}
+    steps:
+      - name: Select only an explicitly qualified build backend
+        id: readiness
+        env:
+          BACKEND: ${{ vars.FPGA_CI_BACKEND || 'source-only' }}
+          DIRECT_ENABLED: ${{ vars.FPGA_BUILD_ENABLED }}
+          SSM_ENABLED: ${{ vars.FPGA_SSM_ENABLED }}
+          RUNNER: ${{ vars.FPGA_BLACKSMITH_RUNNER }}
+          HDK_ROOT: ${{ vars.FPGA_HDK_ROOT }}
+          VIVADO_SETTINGS: ${{ vars.FPGA_VIVADO_SETTINGS }}
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$BACKEND" in
+            source-only)
+              echo '::error::FPGA builds are disabled (source-only backend). Source checks passed; no routed artifact was produced.'
+              echo 'Select and qualify a direct or SSM backend before enabling licensed builds. See fpga/aws/ci/README.md.' >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            ssm)
+              if [[ "$SSM_ENABLED" != true ]]; then
+                echo '::error::SSM FPGA backend is not activated. The trusted-main controller and target-host runtime must be installed and qualified before FPGA_SSM_ENABLED=true.'
+                echo 'Source checks passed; SSM runtime remains disabled and no routed artifact was produced.' >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+              echo 'backend=ssm' >> "$GITHUB_OUTPUT"
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              echo 'Build handoff uses the trusted-main controller workflow. That workflow verifies current exact-SHA eligibility, host readiness, and qualified artifacts independently.' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            direct)
+              if [[ "$IS_FORK" == true ]]; then
+                echo '::error::Fork source checks passed; direct licensed builders cannot execute fork code. Use the qualified SSM route with maintainer approval of the exact SHA.'
+                exit 1
+              fi
+              if [[ "$DIRECT_ENABLED" != true || -z "$RUNNER" || -z "$HDK_ROOT" || -z "$VIVADO_SETTINGS" ]]; then
+                echo '::error::Direct FPGA builder is not activated. Qualify its isolation, tools and license, then configure FPGA_BUILD_ENABLED, FPGA_BLACKSMITH_RUNNER, FPGA_HDK_ROOT, and FPGA_VIVADO_SETTINGS.'
+                echo 'Source checks passed; no routed artifact was produced.' >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+              echo 'backend=direct' >> "$GITHUB_OUTPUT"
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo '::error::FPGA_CI_BACKEND must be source-only, direct, or ssm.'
+              exit 1
+              ;;
+          esac
+
+  build:
+    name: Route, qualify, and package FPGA checkpoint
+    needs: [source-checks, readiness]
+    if: needs.readiness.outputs.backend == 'direct' && needs.readiness.outputs.enabled == 'true'
+    runs-on: ${{ vars.FPGA_BLACKSMITH_RUNNER }}
+    timeout-minutes: 360
+    # One licensed build at a time; no image-promotion or AWS credentials here.
+    concurrency:
+      group: coral-fpga-licensed-builder
+      cancel-in-progress: false
+      queue: max
+    env:
+      AWS_FPGA_REPO_DIR: ${{ vars.FPGA_HDK_ROOT }}
+      VIVADO_SETTINGS: ${{ vars.FPGA_VIVADO_SETTINGS }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BUILD_TAG: pr-${{ github.event.pull_request.number || 'manual' }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set isolated output directory
+        shell: bash
+        run: echo "BUILD_OUTPUT=$RUNNER_TEMP/coral-fpga-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Verify tools, synthesis license probe, pins, and resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ShellCheck cannot inspect the provisioned vendor setup script.
+          # shellcheck disable=SC1090
+          source "$VIVADO_SETTINGS"
+          python3 fpga/aws/build/build.py --hdk-root "$AWS_FPGA_REPO_DIR" --output "$BUILD_OUTPUT-preflight" --tag "$BUILD_TAG" --preflight
+      - name: Generate RTL, synthesize, route, qualify, and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ShellCheck cannot inspect the provisioned vendor setup script.
+          # shellcheck disable=SC1090
+          source "$VIVADO_SETTINGS"
+          python3 fpga/aws/build/build.py --hdk-root "$AWS_FPGA_REPO_DIR" --output "$BUILD_OUTPUT" --tag "$BUILD_TAG"
+      - name: Upload qualified developer checkpoint
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fpga-developer-cl-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.BUILD_OUTPUT }}/cl_coralnpu/build/checkpoints/*.Developer_CL.tar
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Upload build evidence even when qualification fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fpga-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.BUILD_OUTPUT }}/logs/
+            ${{ env.BUILD_OUTPUT }}/validation/
+            ${{ env.BUILD_OUTPUT }}/*.json
+            ${{ env.BUILD_OUTPUT }}-preflight/logs/
+            ${{ env.BUILD_OUTPUT }}-preflight/*.json
+          if-no-files-found: error
+          retention-days: 7

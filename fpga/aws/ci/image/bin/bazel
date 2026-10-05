@@ -1,0 +1,16 @@
+#!/bin/sh
+# Offline public repository cache only. No shared output base/server or home.
+# The repository cache is a private bounded per-run copy populated from the
+# reviewed public dependency snapshot; absent entries fail without downloading.
+set -eu
+if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+  exec /deps/tools/bazel --version
+fi
+if [ "$#" -lt 1 ] || [ "$1" != "build" ]; then
+  printf '%s\n' 'Only pinned offline Bazel build is supported' >&2
+  exit 2
+fi
+exec /deps/tools/bazel --batch --output_user_root=/job/build/bazel-user-root \
+  "$@" --repository_cache=/job/build/bazel-repository-cache \
+  --repository_disable_download --experimental_repository_cache_hardlinks=false \
+  --lockfile_mode=error
