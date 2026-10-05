@@ -42,8 +42,9 @@ print "Reading CL IP blocks"
 
 #---- User would uncomment and/or list IPs required in their design ----
 
-## DDR IP
-# read_ip ${HDK_IP_SRC_DIR}/cl_ddr4_32g/cl_ddr4_32g.xci
+## DDR IP: the pinned controller is mandatory for the DDR-enabled wrapper.
+set_property XPM_LIBRARIES {XPM_CDC XPM_MEMORY XPM_FIFO} [current_project]
+read_ip ${HDK_IP_SRC_DIR}/cl_ddr4_32g/cl_ddr4_32g.xci
 
 ## HBM IP's
 # read_ip ${HDK_IP_SRC_DIR}/cl_hbm_mmcm/cl_hbm_mmcm.xci
@@ -128,6 +129,11 @@ print "Connecting debug network"
 
 #---- End of section replaced by User ----
 
+
+# Require DDR calibration contents before the HDK footer closes the design.
+source ${scripts_dir}/ddr_calibration_gate.tcl
+coral_require_ddr_calibration
+puts "CORAL_STAGE_DDR_CALIBRATION_PASSED"
 
 # Common footer
 source ${HDK_SHELL_DIR}/build/scripts/synth_cl_footer.tcl

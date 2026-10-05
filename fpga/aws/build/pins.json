@@ -19,7 +19,13 @@
   "reference_include_inventory_sha256": "d9bbf0565c24264f5062c4b226be0621ee9883ad8719e228a5276fc1cf4483ed",
   "top": "RvvCoreMiniAxi",
   "rtl_target": "//hdl/chisel/src/coralnpu:rvv_core_mini_axi_cc_library_emit_verilog",
-  "defines": ["USE_GENERIC", "FPGA_XILINX", "SYNTHESIS", "VLEN_128", "ZVE32F_ON"],
+  "defines": [
+    "USE_GENERIC",
+    "FPGA_XILINX",
+    "SYNTHESIS",
+    "VLEN_128",
+    "ZVE32F_ON"
+  ],
   "itcm_bytes": 8192,
   "dtcm_bytes": 32768,
   "dtcm_base": 65536,
@@ -27,10 +33,34 @@
   "core_clock_hz": 50000000,
   "shell_clock_hz": 250000000,
   "clock_divider": 5,
-  "clock_recipes": ["A1", "B2", "C0", "H2"],
-  "directives": ["SSI_SpreadLogic_high", "AggressiveExplore", "AggressiveExplore"],
+  "clock_recipes": [
+    "A1",
+    "B2",
+    "C0",
+    "H2"
+  ],
+  "directives": [
+    "SSI_SpreadLogic_high",
+    "AggressiveExplore",
+    "AggressiveExplore"
+  ],
   "minimum_cpus": 16,
   "minimum_memory_gib": 32,
   "minimum_free_disk_gib": 100,
-  "timeouts_seconds": {"rtl": 7200, "simulation": 1800, "synthesis": 7200, "implementation": 14400, "validation": 1800}
+  "timeouts_seconds": {
+    "rtl": 7200,
+    "simulation": 1800,
+    "synthesis": 7200,
+    "implementation": 14400,
+    "validation": 1800
+  },
+  "ddr_enabled": true,
+  "hbm_enabled": false,
+  "ddr_cpu_base": 536870912,
+  "ddr_aperture_bytes": 2147483648,
+  "ddr_pcis_base": 0,
+  "ddr_axi_data_bits": 512,
+  "ddr_axi_clock_hz": 250000000,
+  "ddr_register_abi": 1,
+  "ddr4_xci_sha256": "b71de9304ac7a5a56ce7bda38b98a93f7cb5abcecb6c8ef4bd67e42afe8a7c78"
 }

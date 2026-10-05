@@ -164,6 +164,47 @@ class GatesTest(unittest.TestCase):
                                  ('cdc', CDC), ('exceptions', EXCEPTIONS)]:
                 (root / f'{name}.rpt').write_text(header + report)
             self.assertTrue(gates.qualify(root, logs, cp, pins)['qualified'])
+            synthesis = logs['synthesis']
+            original = synthesis.read_text()
+            synthesis.write_text(
+                original + '\nAWS FPGA: (15:46:07): '
+                'CRITICAL WARNING: MiG BRAM is not populated\n'
+            )
+            self.assertTrue(
+                any(
+                    'Unreviewed critical warnings' in blocker for blocker in
+                    gates.qualify(root, logs, cp, pins)['blockers']
+                )
+            )
+            synthesis.write_text(original)
+            ddr_pins = dict(pins, ddr_enabled=True)
+            self.assertFalse(
+                gates.qualify(root, logs, cp, ddr_pins)['qualified']
+            )
+            synthesis.write_text(
+                original + '\nCORAL_STAGE_DDR_CALIBRATION_PASSED\n'
+            )
+            facts_path = root / 'facts.tsv'
+            original_facts = facts_path.read_text()
+            calibration = (
+                "ddr.calibration_bram_cells\t1\n"
+                "ddr.calibration_init_2c\t256'h" + '0' * 63 + '1\n'
+            )
+            facts_path.write_text(original_facts + calibration)
+            self.assertTrue(
+                gates.qualify(root, logs, cp, ddr_pins)['qualified']
+            )
+            facts_path.write_text(
+                original_facts + calibration.replace('0' * 63 + '1', '0' * 64)
+            )
+            self.assertTrue(
+                any(
+                    'calibration INIT_2C' in blocker for blocker in
+                    gates.qualify(root, logs, cp, ddr_pins)['blockers']
+                )
+            )
+            facts_path.write_text(original_facts)
+            synthesis.write_text(original)
             (root / 'facts.tsv').write_text(
                 (root / 'facts.tsv').read_text().replace(
                     'changed_drc_severities\t0', 'changed_drc_severities\t1'

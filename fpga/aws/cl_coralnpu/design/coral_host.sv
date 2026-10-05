@@ -17,7 +17,41 @@ module coral_host (
     output wire [31:0] s_rdata,
     output wire [1:0] s_rresp,
     output wire s_rvalid,
-    input wire s_rready
+    input wire s_rready,
+    output wire [31:0] m_awaddr,
+    output wire [5:0] m_awid,
+    output wire [7:0] m_awlen,
+    output wire [2:0] m_awsize,
+    output wire [1:0] m_awburst,
+    output wire m_awlock,
+    output wire m_awvalid,
+    input wire m_awready,
+    output wire [127:0] m_wdata,
+    output wire [15:0] m_wstrb,
+    output wire m_wlast,
+    output wire m_wvalid,
+    input wire m_wready,
+    input wire [5:0] m_bid,
+    input wire [1:0] m_bresp,
+    input wire m_bvalid,
+    output wire m_bready,
+    output wire [31:0] m_araddr,
+    output wire [5:0] m_arid,
+    output wire [7:0] m_arlen,
+    output wire [2:0] m_arsize,
+    output wire [1:0] m_arburst,
+    output wire m_arlock,
+    output wire m_arvalid,
+    input wire m_arready,
+    input wire [127:0] m_rdata,
+    input wire [5:0] m_rid,
+    input wire [1:0] m_rresp,
+    input wire m_rlast,
+    input wire m_rvalid,
+    output wire m_rready,
+    input wire ddr_ready,
+    ddr_present,
+    ddr_fault
 );
 
   // Capture independent AXI-Lite address/data channels before widening WSTRB.
@@ -27,12 +61,25 @@ module coral_host (
   logic [1:0] read_lane;
   wire n_awready, n_wready, n_arready;
   wire [127:0] n_rdata;
-  wire n_awvalid = wr_busy && !aw_sent;
-  wire n_wvalid = wr_busy && !w_sent;
+  wire status_write = aw_q[31:8] == 24'h000400;
+  wire core_bvalid;
+  wire [1:0] core_bresp;
+  wire n_awvalid = wr_busy && !aw_sent && !status_write;
+  wire n_wvalid = wr_busy && !w_sent && !status_write;
+  assign s_bvalid  = (wr_busy && status_write) || core_bvalid;
+  assign s_bresp   = (wr_busy && status_write) ? 2'b11 : core_bresp;
   assign s_awready = !aw_full && !wr_busy;
   assign s_wready  = !w_full && !wr_busy;
-  assign s_arready = !rd_busy && n_arready;
-  assign s_rdata   = n_rdata[read_lane*32+:32];
+  wire status_select = s_araddr[31:8] == 24'h000400;
+  logic status_pending;
+  logic [31:0] status_data;
+  logic [1:0] status_resp;
+  wire core_rvalid;
+  wire [1:0] core_rresp;
+  assign s_arready = !rd_busy && (status_select || n_arready);
+  assign s_rvalid  = status_pending || core_rvalid;
+  assign s_rresp   = status_pending ? status_resp : core_rresp;
+  assign s_rdata   = status_pending ? status_data : n_rdata[read_lane*32+:32];
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       aw_full <= 0;
@@ -45,6 +92,9 @@ module coral_host (
       wd_q <= 0;
       ws_q <= 0;
       read_lane <= 0;
+      status_pending <= 0;
+      status_data <= 0;
+      status_resp <= 0;
     end else begin
       if (s_awvalid && s_awready) begin
         aw_q <= s_awaddr;
@@ -70,51 +120,29 @@ module coral_host (
       if (s_arvalid && s_arready) begin
         rd_busy   <= 1;
         read_lane <= s_araddr[3:2];
+        if (status_select) begin
+          status_pending <= 1;
+          status_resp <= 0;
+          case (s_araddr[7:0])
+            8'h00: status_data <= 32'h43444452;
+            8'h04: status_data <= {29'b0, ddr_fault, ddr_present, ddr_ready};
+            8'h08: status_data <= 32'h80000000;
+            8'h0c: status_data <= 32'h20000000;
+            8'h10: status_data <= 32'h00000001;
+            default: begin
+              status_data <= 0;
+              status_resp <= 2'b11;
+            end
+          endcase
+        end
       end
-      if (s_rvalid && s_rready) rd_busy <= 0;
+      if (s_rvalid && s_rready) begin
+        rd_busy <= 0;
+        status_pending <= 0;
+      end
     end
   end
 
-  // This first bring-up exposes TCM/CSRs only. Complete external-memory
-  // requests with DECERR rather than leaving the core waiting forever.
-  wire m_awvalid, m_wvalid, m_wlast, m_bready, m_arvalid, m_rready;
-  wire [5:0] m_awid, m_arid;
-  wire [7:0] m_arlen;
-  logic ext_wr_active, ext_bvalid, ext_rvalid;
-  logic [5:0] ext_bid, ext_rid;
-  logic [7:0] ext_remaining;
-  wire m_awready = !ext_wr_active && !ext_bvalid;
-  wire m_wready = ext_wr_active && !ext_bvalid;
-  wire m_arready = !ext_rvalid;
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      ext_wr_active <= 0;
-      ext_bvalid <= 0;
-      ext_rvalid <= 0;
-      ext_bid <= 0;
-      ext_rid <= 0;
-      ext_remaining <= 0;
-    end else begin
-      if (m_awvalid && m_awready) begin
-        ext_wr_active <= 1;
-        ext_bid <= m_awid;
-      end
-      if (m_wvalid && m_wready && m_wlast) begin
-        ext_wr_active <= 0;
-        ext_bvalid <= 1;
-      end
-      if (ext_bvalid && m_bready) ext_bvalid <= 0;
-      if (m_arvalid && m_arready) begin
-        ext_rvalid <= 1;
-        ext_rid <= m_arid;
-        ext_remaining <= m_arlen;
-      end
-      if (ext_rvalid && m_rready) begin
-        if (ext_remaining == 0) ext_rvalid <= 0;
-        else ext_remaining <= ext_remaining - 1'b1;
-      end
-    end
-  end
   RvvCoreMiniAxi i_core (
       .io_aclk(clk),
       .io_aresetn(rst_n),
@@ -135,12 +163,12 @@ module coral_host (
       .io_axi_slave_write_data_bits_data({4{wd_q}}),
       .io_axi_slave_write_data_bits_last(1'b1),
       .io_axi_slave_write_data_bits_strb(({12'b0, ws_q} << (aw_q[3:2] * 4))),
-      .io_axi_slave_write_resp_ready(s_bready),
-      .io_axi_slave_write_resp_valid(s_bvalid),
+      .io_axi_slave_write_resp_ready(s_bready && !status_write),
+      .io_axi_slave_write_resp_valid(core_bvalid),
       .io_axi_slave_write_resp_bits_id(),
-      .io_axi_slave_write_resp_bits_resp(s_bresp),
+      .io_axi_slave_write_resp_bits_resp(core_bresp),
       .io_axi_slave_read_addr_ready(n_arready),
-      .io_axi_slave_read_addr_valid((s_arvalid && !rd_busy)),
+      .io_axi_slave_read_addr_valid((s_arvalid && !rd_busy && !status_select)),
       .io_axi_slave_read_addr_bits_addr(s_araddr),
       .io_axi_slave_read_addr_bits_prot(3'b0),
       .io_axi_slave_read_addr_bits_id(6'b0),
@@ -151,51 +179,51 @@ module coral_host (
       .io_axi_slave_read_addr_bits_cache(4'b0),
       .io_axi_slave_read_addr_bits_qos(4'b0),
       .io_axi_slave_read_addr_bits_region(4'b0),
-      .io_axi_slave_read_data_ready(s_rready),
-      .io_axi_slave_read_data_valid(s_rvalid),
+      .io_axi_slave_read_data_ready(s_rready && !status_pending),
+      .io_axi_slave_read_data_valid(core_rvalid),
       .io_axi_slave_read_data_bits_data(n_rdata),
       .io_axi_slave_read_data_bits_id(),
-      .io_axi_slave_read_data_bits_resp(s_rresp),
+      .io_axi_slave_read_data_bits_resp(core_rresp),
       .io_axi_slave_read_data_bits_last(),
       .io_axi_master_write_addr_ready(m_awready),
       .io_axi_master_write_addr_valid(m_awvalid),
-      .io_axi_master_write_addr_bits_addr(),
+      .io_axi_master_write_addr_bits_addr(m_awaddr),
       .io_axi_master_write_addr_bits_prot(),
       .io_axi_master_write_addr_bits_id(m_awid),
-      .io_axi_master_write_addr_bits_len(),
-      .io_axi_master_write_addr_bits_size(),
-      .io_axi_master_write_addr_bits_burst(),
-      .io_axi_master_write_addr_bits_lock(),
+      .io_axi_master_write_addr_bits_len(m_awlen),
+      .io_axi_master_write_addr_bits_size(m_awsize),
+      .io_axi_master_write_addr_bits_burst(m_awburst),
+      .io_axi_master_write_addr_bits_lock(m_awlock),
       .io_axi_master_write_addr_bits_cache(),
       .io_axi_master_write_addr_bits_qos(),
       .io_axi_master_write_addr_bits_region(),
       .io_axi_master_write_data_ready(m_wready),
       .io_axi_master_write_data_valid(m_wvalid),
-      .io_axi_master_write_data_bits_data(),
+      .io_axi_master_write_data_bits_data(m_wdata),
       .io_axi_master_write_data_bits_last(m_wlast),
-      .io_axi_master_write_data_bits_strb(),
+      .io_axi_master_write_data_bits_strb(m_wstrb),
       .io_axi_master_write_resp_ready(m_bready),
-      .io_axi_master_write_resp_valid(ext_bvalid),
-      .io_axi_master_write_resp_bits_id(ext_bid),
-      .io_axi_master_write_resp_bits_resp(2'b11),
+      .io_axi_master_write_resp_valid(m_bvalid),
+      .io_axi_master_write_resp_bits_id(m_bid),
+      .io_axi_master_write_resp_bits_resp(m_bresp),
       .io_axi_master_read_addr_ready(m_arready),
       .io_axi_master_read_addr_valid(m_arvalid),
-      .io_axi_master_read_addr_bits_addr(),
+      .io_axi_master_read_addr_bits_addr(m_araddr),
       .io_axi_master_read_addr_bits_prot(),
       .io_axi_master_read_addr_bits_id(m_arid),
       .io_axi_master_read_addr_bits_len(m_arlen),
-      .io_axi_master_read_addr_bits_size(),
-      .io_axi_master_read_addr_bits_burst(),
-      .io_axi_master_read_addr_bits_lock(),
+      .io_axi_master_read_addr_bits_size(m_arsize),
+      .io_axi_master_read_addr_bits_burst(m_arburst),
+      .io_axi_master_read_addr_bits_lock(m_arlock),
       .io_axi_master_read_addr_bits_cache(),
       .io_axi_master_read_addr_bits_qos(),
       .io_axi_master_read_addr_bits_region(),
       .io_axi_master_read_data_ready(m_rready),
-      .io_axi_master_read_data_valid(ext_rvalid),
-      .io_axi_master_read_data_bits_data(128'b0),
-      .io_axi_master_read_data_bits_id(ext_rid),
-      .io_axi_master_read_data_bits_resp(2'b11),
-      .io_axi_master_read_data_bits_last((ext_remaining == 0)),
+      .io_axi_master_read_data_valid(m_rvalid),
+      .io_axi_master_read_data_bits_data(m_rdata),
+      .io_axi_master_read_data_bits_id(m_rid),
+      .io_axi_master_read_data_bits_resp(m_rresp),
+      .io_axi_master_read_data_bits_last(m_rlast),
       .io_halted(),
       .io_fault(),
       .io_wfi(),

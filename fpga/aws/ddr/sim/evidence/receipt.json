@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-05T14:46:20.096834+00:00",
+  "scope": "Local functional simulation only; no physical DDR, vendor XPM simulation, synthesis, placement, routing, timing, or full-model qualification.",
+  "rtl_sha256": {
+    "fpga/aws/build/sim/tb_host.sv": "741404ebb5e8868a27e9c76712e773689706d6c257236633b9fcb613d32a98a8",
+    "fpga/aws/cl_coralnpu/design/coral_ddr_backend.sv": "542c26862b3f764a4d02e63a36d5a52b9f1defca9afe9bf91e7c390118c13030",
+    "fpga/aws/cl_coralnpu/design/coral_ddr_cdc.sv": "34f8793023e610ca896fde743d842120f2f4538dac5c3cd3eecaf0a99975b535",
+    "fpga/aws/cl_coralnpu/design/coral_ddr_frontend.sv": "938fef7f7f33474c248829aca9ec45fee0345cd26f9738ff14b389993de57537",
+    "fpga/aws/cl_coralnpu/design/coral_ddr_subsystem.sv": "8546c9c0726f3b8ecfba69887de1cfd63b314f27991e2b8d9a2373ef673b830d",
+    "fpga/aws/cl_coralnpu/design/coral_host.sv": "6f73b6cc3d60181d145a54a15f433ad1b527b1b76d12a288f35d7886ec5dc3b4",
+    "fpga/aws/ddr/sim/tb_ddr_backend.sv": "b18af46334b0196481d0a27f517fb03f57d8775a2df9a1fddc14fa6ad8656e42",
+    "fpga/aws/ddr/sim/tb_ddr_cdc.sv": "af0cc28eacff71258db947c43f9c630fb7bc89fcb9c1265272ca4b16ce57fe41",
+    "fpga/aws/ddr/sim/tb_ddr_frontend.sv": "a6d2872a880d13e491b5c672011155a3a1b2dd862d9c73a0242597b1d9823beb",
+    "fpga/aws/ddr/sim/test_rtl.py": "d903abf0abe9f6a17d9a3bf85a664275ab1b9a1093967927c6cc54a056a6a596",
+    "fpga/aws/ddr/sim/xpm_fifo_async_model.sv": "06cb4397552ac524742cd5a9975409b5cef64b409ff357495ac18aeb9c9804d6"
+  },
+  "protocol": {
+    "status": "PASS",
+    "command": "python3 fpga/aws/ddr/sim/test_rtl.py -v",
+    "tests": [
+      "backend",
+      "cdc",
+      "core_frontend_128",
+      "pcis_frontend_512"
+    ],
+    "log": "protocol.log",
+    "simulator": "Icarus Verilog version 13.0 (stable) (v13_0)",
+    "cdc_model": "Portable functional XPM model; not AMD implementation or CDC timing qualification."
+  },
+  "host_regression": {
+    "status": "PASS",
+    "simulator": "Verilator 5.050 2026-07-01",
+    "core_rtl_sha256": "2a19a5c7ea2ece404b0fa77e883810de061319920fb7c9f71927017803407720",
+    "core_source": "Pinned reference emitted RTL from build/pins.json",
+    "log": "host-regression.log",
+    "checks": [
+      "DDR identity, aperture, CPU base, ABI version, status bits, and rejected writes",
+      "TCM lane mapping and byte strobes",
+      "Independent AW/W and response backpressure",
+      "Scalar execution and reset/restart: 42, 43",
+      "RVV vector addition: 11, 22, 33, 44"
+    ],
+    "local_build_note": "Initial ccache default path was unwritable; relocated cache under temporary output. The ccache wrapper produced x86_64 objects; final link explicitly used -arch x86_64. Simulation passed with unchanged RTL."
+  },
+  "not_run": [
+    "AMD XPM simulation",
+    "DDR4 controller vendor simulation",
+    "Synthesis/place/route/timing/DRC",
+    "Physical DDR readback",
+    "Full Qwen3-0.6B or Bonsai1.7B token inference"
+  ]
+}

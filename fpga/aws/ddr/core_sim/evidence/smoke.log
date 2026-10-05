@@ -1,0 +1,8 @@
+READBACK 00010000 0000002a
+READBACK 20010004 0000002a
+READBACK 20010008 aabb2add
+COUNTS core_reads=7 core_writes=2 ddr_reads=9 ddr_writes=4
+PASS: real Coral core boot, DDR instruction/data access, host load/readback and halt
+- S i m u l a t i o n   R e p o r t: Verilator 5.050 2026-07-01
+- Verilator: $finish at 4us; walltime 0.034 s; speed 105.987 us/s
+- Verilator: cpu 0.034 s on 1 threads; allocated 16 MB

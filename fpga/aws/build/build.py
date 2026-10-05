@@ -86,8 +86,9 @@ def source_check():
     wrapper = (AWS / "cl_coralnpu/design/cl_coralnpu.sv").read_text()
     require(".BUFGCE_DIVIDE(5)" in wrapper, "Unexpected NPU divider")
     require(
-        "parameter EN_DDR = 0" in wrapper
-        and "parameter EN_HBM = 0" in wrapper, "Memory configuration changed"
+        "parameter EN_DDR = 1" in wrapper
+        and "parameter EN_HBM = 0" in wrapper,
+        "Expected DDR enabled / HBM disabled configuration"
     )
     require(
         "cl_axi_clock_converter_light i_host_cdc" in wrapper,
@@ -101,6 +102,17 @@ def source_check():
         "`ifdef SYNTHESIS" in (REPO / "hdl/verilog/Sram.v").read_text(),
         "Synthesizable SRAM branch missing"
     )
+    require(
+        PINS["ddr_enabled"] and not PINS["hbm_enabled"],
+        "Memory enable pins differ"
+    )
+    require(
+        PINS["ddr_cpu_base"] == 0x20000000
+        and PINS["ddr_aperture_bytes"] == 0x80000000
+        and PINS["ddr_axi_data_bits"] == 512
+        and PINS["ddr_axi_clock_hz"] == PINS["shell_clock_hz"],
+        "DDR address/width/clock pins differ"
+    )
     subprocess.run([
         sys.executable, "-m", "unittest", "discover", "-s",
         str(HERE), "-p", "test_*.py"
@@ -109,7 +121,52 @@ def source_check():
     print("CORAL_SOURCE_CHECK_PASSED")
 
 
-def preflight(hdk, out):
+def validate_vivado_version(text):
+    versions = re.findall(
+        r"^[ \t]*Vivado v([0-9]+\.[0-9]+)(?:[ \t]|$)", text, re.M | re.I
+    )
+    builds = re.findall(
+        r"^[ \t]*SW Build ([0-9]+)(?:[ \t]|$)", text, re.M | re.I
+    )
+    require(
+        versions == [PINS["vivado_version"]]
+        and builds == [PINS["vivado_build"]],
+        "Wrong or ambiguous Vivado version/SW build"
+    )
+    return {"version": versions[0], "build": builds[0]}
+
+
+def check_bazel(cached_rtl_receipt=None):
+    if cached_rtl_receipt is None:
+        require(
+            capture(["bazel",
+                     "--version"]) == "bazel " + PINS["bazel_version"],
+            "Wrong Bazel version"
+        )
+        return {
+            "version": PINS["bazel_version"],
+            "executed": True,
+            "scope": "current executable --version"
+        }
+    require(
+        cached_rtl_receipt.get("rtl_generation")
+        == "cached_pinned_output_verified_not_regenerated"
+        and cached_rtl_receipt.get("artifact_emission_sha")
+        == PINS["coral_reference_commit"] and re.fullmatch(
+            r"[0-9a-f]{64}", cached_rtl_receipt.get("manifest_sha256", "")
+        ),
+        "Verified cached RTL receipt required before omitting Bazel execution"
+    )
+    return {
+        "version": None,
+        "executed": False,
+        "historical_generator_version_pin": PINS["bazel_version"],
+        "scope": "reused verified reference RTL; Bazel not executed",
+        "cache_manifest_sha256": cached_rtl_receipt["manifest_sha256"]
+    }
+
+
+def preflight(hdk, out, *, cached_rtl_receipt=None):
     require(
         platform.system() == "Linux" and platform.machine() == "x86_64",
         "Build runner must be Linux x86_64"
@@ -150,6 +207,8 @@ def preflight(hdk, out):
         shell / "build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp",
         "clock_converter_xci": hdk /
         "hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci",
+        "ddr4_xci": hdk /
+        "hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_ddr4_32g/cl_ddr4_32g.xci",
         "build_all_tcl": shell / "build/scripts/build_all.tcl",
         "encrypt_tcl": shell / "build/scripts/encrypt.tcl",
     }
@@ -160,14 +219,8 @@ def preflight(hdk, out):
             f"Wrong dependency hash: {name}"
         )
     version = capture(["vivado", "-version"])
-    require(
-        f"Vivado v{PINS['vivado_version']}" in version
-        and PINS["vivado_build"] in version, "Wrong Vivado version/build"
-    )
-    require(
-        capture(["bazel", "--version"]) == "bazel " + PINS["bazel_version"],
-        "Wrong Bazel version"
-    )
+    validate_vivado_version(version)
+    bazel_check = check_bazel(cached_rtl_receipt)
     verilator = os.environ.get("VERILATOR", "verilator")
     require(
         re.search(
@@ -226,9 +279,10 @@ def preflight(hdk, out):
         "tool_versions": {
             "vivado": PINS["vivado_version"],
             "vivado_build": PINS["vivado_build"],
-            "bazel": PINS["bazel_version"],
+            "bazel": bazel_check["version"],
             "verilator": PINS["verilator_version"]
         },
+        "bazel_check": bazel_check,
         "dependency_hashes": {
             k: sha256(v)
             for k, v in dependencies.items()
@@ -292,7 +346,14 @@ def validate_parameters(text):
 def build(args, out):
     from gates import qualify, package, validate_stage
     hdk = args.hdk_root.resolve()
-    preflight_result = preflight(hdk, out)
+    cached_receipt = None
+    if args.cached_rtl is not None:
+        from cached_rtl import validate_cache
+        cached_receipt = validate_cache(
+            REPO, args.cached_rtl, PINS, args.cached_rtl_manifest_sha256,
+            git(REPO, "rev-parse", "HEAD")
+        )
+    preflight_result = preflight(hdk, out, cached_rtl_receipt=cached_receipt)
     require(
         re.fullmatch(r"[A-Za-z0-9_-]{1,83}", args.tag),
         "Tag must be 1-83 letters, digits, underscores or hyphens"
@@ -309,6 +370,9 @@ def build(args, out):
     scripts = cl / "build/scripts"
     for name in ("build_all.tcl", "encrypt.tcl"):
         shutil.copy2(shell / "build/scripts" / name, scripts / name)
+    shutil.copy2(
+        HERE / "ddr_calibration_gate.tcl", scripts / "ddr_calibration_gate.tcl"
+    )
     env = os.environ.copy()
     env.update(
         AWS_FPGA_REPO_DIR=str(hdk),
@@ -366,13 +430,23 @@ def build(args, out):
         manifest["stages"][name].update(status="passed", end_unix=time.time())
         write_json(out / "provenance.json", manifest)
 
-    stage(
-        "rtl", lambda: run(["bazel", "build", PINS["rtl_target"]],
-                           out / "logs/rtl.log",
-                           cwd=REPO,
-                           timeout=PINS["timeouts_seconds"]["rtl"])
-    )
-    emitted = REPO / "bazel-bin/hdl/chisel/src/coralnpu/RvvCoreMiniAxi.sv"
+    if cached_receipt is None:
+        stage(
+            "rtl", lambda: run(["bazel", "build", PINS["rtl_target"]],
+                               out / "logs/rtl.log",
+                               cwd=REPO,
+                               timeout=PINS["timeouts_seconds"]["rtl"])
+        )
+        emitted = REPO / "bazel-bin/hdl/chisel/src/coralnpu/RvvCoreMiniAxi.sv"
+        manifest["rtl_generation"] = "generated_for_this_checkout"
+    else:
+        stage(
+            "rtl", lambda:
+            write_json(out / "cached-rtl-receipt.json", cached_receipt)
+        )
+        emitted = args.cached_rtl.resolve() / "RvvCoreMiniAxi.sv"
+        manifest["rtl_generation"] = cached_receipt["rtl_generation"]
+        manifest["cached_rtl"] = cached_receipt
     archive = emitted.with_suffix(".zip")
     prepare_rtl(emitted, archive, cl / "rtl")
     manifest["generated_hashes"] = {
@@ -380,15 +454,9 @@ def build(args, out):
         "archive": sha256(archive)
     }
     reference_diff = git(
-        REPO, "diff", PINS["coral_reference_commit"], "--", "hdl", "rules",
-        "third_party", "MODULE.bazel", "MODULE.bazel.lock", ".bazelrc",
-        ".bazelversion"
+        REPO, "diff", PINS["coral_reference_commit"], "--", ".",
+        ":(exclude)fpga", ":(exclude).github"
     )
-    if not reference_diff:
-        require(
-            sha256(emitted) == PINS["reference_emitted_rtl_sha256"],
-            "Unmodified reference source emitted unexpected RTL; generator/tool provenance differs"
-        )
     for path in sorted((cl / "rtl/include").iterdir()):
         manifest["generated_hashes"]["include/" + path.name] = sha256(path)
     includes = {p.name: sha256(p) for p in (cl / "rtl/include").iterdir()}
@@ -396,10 +464,21 @@ def build(args, out):
         json.dumps(includes, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     manifest["include_inventory_sha256"] = inventory_hash
-    if not reference_diff:
+    if not reference_diff and cached_receipt is None:
+        from stamp_identity import validate_emission
+        manifest["emitted_reference_identity"] = validate_emission(
+            REPO,
+            emitted,
+            cl / "rtl/include",
+            PINS,
+            pr_head_sha=os.environ.get("PR_HEAD_SHA"),
+            github_checkout_sha=os.environ.get("GITHUB_SHA")
+        )
+    elif cached_receipt is not None:
         require(
-            inventory_hash == PINS["reference_include_inventory_sha256"],
-            "Unmodified source emitted unexpected black-box/SRAM includes"
+            sha256(emitted) == PINS["reference_emitted_rtl_sha256"]
+            and inventory_hash == PINS["reference_include_inventory_sha256"],
+            "Copied cached RTL differs from verified reference bytes"
         )
     header = emitted.parent / "VRvvCoreMiniAxi_parameters.h"
     manifest["generated_parameters"] = validate_parameters(header.read_text())
@@ -437,6 +516,26 @@ def build(args, out):
             require(marker in text, f"Simulation missing result: {marker}")
 
     stage("simulation", simulate)
+
+    def simulate_ddr():
+        # A missing simulator must not silently turn unittest SKIP into proof.
+        require(
+            shutil.which("iverilog") and shutil.which("vvp"),
+            "DDR protocol qualification requires iverilog and vvp"
+        )
+        manifest["ddr_simulation_tools"] = {
+            name: capture([name, "-V"])
+            for name in ("iverilog", "vvp")
+        }
+        run([
+            sys.executable, "-m", "unittest", "discover", "-s",
+            str(AWS / "ddr/sim"), "-p", "test_*.py", "-v"
+        ],
+            out / "logs/ddr-simulation.log",
+            cwd=REPO,
+            timeout=300)
+
+    stage("ddr_simulation", simulate_ddr)
     for name, flow in (("synthesis", "SynthCL"), ("implementation", "ImplCL")):
 
         def vivado_stage(name=name, flow=flow):
@@ -494,6 +593,18 @@ def build(args, out):
             for name, digest in hashes.items()),
         "Source changed during the build; refusing to bind this checkpoint to stale provenance"
     )
+    if cached_receipt is not None:
+        require(
+            all(
+                sha256(args.cached_rtl / name) == entry["sha256"]
+                for name, entry in cached_receipt["files"].items()
+            ), "Cached RTL input changed during the build"
+        )
+        require(
+            sha256(args.cached_rtl / "cache-manifest.json"
+                   ) == cached_receipt["manifest_sha256"],
+            "Cache manifest changed during the build"
+        )
     qualification = qualify(
         validation, {
             n: out / "logs" / (n + ".log")
@@ -555,6 +666,8 @@ def main():
 
     signal.signal(signal.SIGTERM, cancelled)
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cached-rtl", type=Path)
+    parser.add_argument("--cached-rtl-manifest-sha256")
     parser.add_argument("--source-check", action="store_true")
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument(
@@ -565,6 +678,15 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--tag")
     args = parser.parse_args()
+    require((args.cached_rtl is None) == (
+        args.cached_rtl_manifest_sha256 is None
+    ), "Cached RTL directory and reviewed manifest SHA must be supplied together"
+            )
+    if args.cached_rtl is not None:
+        # Cached intake requires a clean checkout, including ignored files.
+        # Keep our own imports and child Python checks from dirtying it.
+        sys.dont_write_bytecode = True
+        os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
     if args.source_check:
         source_check()
         return
@@ -579,7 +701,19 @@ def main():
     (out / "logs").mkdir()
     try:
         if args.preflight:
-            preflight(args.hdk_root.resolve(), out)
+            cached_receipt = None
+            if args.cached_rtl is not None:
+                from cached_rtl import validate_cache
+                cached_receipt = validate_cache(
+                    REPO, args.cached_rtl, PINS,
+                    args.cached_rtl_manifest_sha256,
+                    git(REPO, "rev-parse", "HEAD")
+                )
+            preflight(
+                args.hdk_root.resolve(),
+                out,
+                cached_rtl_receipt=cached_receipt
+            )
             print("CORAL_PREFLIGHT_PASSED")
         else:
             build(args, out)

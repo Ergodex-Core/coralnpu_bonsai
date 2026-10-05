@@ -13,6 +13,8 @@ open_checkpoint $checkpoint
 if {[get_property PART [current_design]] ne "xcvu47p-fsvh2892-2-e"} {
     error "Unexpected FPGA device"
 }
+source [file join [file dirname [info script]] ddr_calibration_gate.tcl]
+set ddr_calibration [coral_require_ddr_calibration]
 set fully_routed [report_route_status -boolean_check ROUTED_FULLY]
 set route_errors [report_route_status -boolean_check ERRORS_IN_ROUTES]
 report_route_status -file $out/route_status.rpt
@@ -25,6 +27,8 @@ report_methodology -file $out/methodology.rpt
 report_cdc -details -file $out/cdc.rpt
 report_exceptions -coverage -file $out/exceptions.rpt
 set facts [open $out/facts.tsv w]
+puts $facts "ddr.calibration_bram_cells\t[dict get $ddr_calibration cells]"
+puts $facts "ddr.calibration_init_2c\t[dict get $ddr_calibration init_2c]"
 puts $facts "fully_routed\t$fully_routed"
 puts $facts "route_errors\t$route_errors"
 puts $facts "existing_waivers\t[llength [get_waivers -quiet]]"
