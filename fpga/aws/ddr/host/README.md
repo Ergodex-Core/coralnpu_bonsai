@@ -44,6 +44,24 @@ every greedy token must match. Defaults are `--atol 1e-4 --rtol 1e-4`; these are
 comparison settings, not a claim that the real models satisfy that tolerance.
 Without a reference, completed execution reports `EXECUTED_UNVERIFIED`.
 
+Before model loading, qualify the already loaded DDR image with independent
+memory patterns at the aperture's first, middle and last cache lines. The core
+smoke option boots hand-encoded RV32 instructions through ITCM into DDR and
+checks core loads, stores and byte preservation:
+
+```sh
+python3 fpga/aws/ddr/host/run_memory_smoke.py \
+  --execute-hardware --core-smoke \
+  --expected-agfi "$APPROVED_IMAGE" --expected-shell "$APPROVED_SHELL" \
+  --slot 0 --timeout 30 --report /path/to/ddr-memory-smoke.json
+```
+
+Omitting `--execute-hardware` performs preflight only. This runner uses the same
+slot lock and bounded reset cleanup as model inference. It overwrites its test
+windows and core fixture regions, so run it before loading model inputs. Client
+out-of-bounds rejection is explicitly software-only evidence. Memory smoke wall
+times are transport diagnostics, not model TTFT or token throughput.
+
 The JSON report includes generated IDs, EOS/length stop reason, file hashes,
 per-prediction comparison results, load/readback wall time, execution wall time,
 and firmware 64-bit cycle counters for prefill, decode, first token and total.
