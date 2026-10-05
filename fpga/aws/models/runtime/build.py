@@ -92,7 +92,7 @@ def main():
     image = ElfImage(elf, digest)
     tracked = sources + [
         HERE / n for n in (
-            'decoder.h', 'math.h', 'generate.h', 'mailbox.h', 'ddr.ld',
+            'decoder.h', 'math.h', 'q8_0.h', 'address_range.h', 'generate.h', 'mailbox.h', 'ddr.ld',
             'build.py'
         )
     ] + [
