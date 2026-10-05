@@ -16,10 +16,12 @@ those later stages.
 Source and host-test checks run on `blacksmith-2vcpu-ubuntu-2404`, with a
 ten-minute timeout and no licensed tools or host credentials.
 
-The PR workflow deliberately fails its readiness job until a licensed,
-isolated Blacksmith builder is provisioned and approved. Committing this YAML
-does not enable a working FPGA build service. No existing image is uploaded,
-created, or loaded by this workflow.
+The PR workflow defaults to source-only mode and explicitly fails build readiness
+while the licensed backend is disabled. The trusted existing-host controller and
+its fixed host runtime are implemented under [ci/](ci/), with local regression
+coverage. Host installation, containment and licensing still require live
+qualification. No fresh routed checkpoint has been produced by this service.
+The workflows do not upload, create or load FPGA images.
 
 The reference routed candidate had positive setup/hold slack, but retained
 DRC warnings, critical warnings, shell timing exceptions, and clock-review
@@ -65,83 +67,83 @@ image or evidence of a hardware test pass.
 
 The checked-out source commit is the input under test. The reference Coral
 revision is retained for comparison, not used to replace every PR's RTL.
-GitHub's `pull_request` checkout uses the proposed merge commit; provenance
-must distinguish that revision from the PR head revision.
+The direct runner builds GitHub's proposed merge commit. The trusted SSM
+controller builds the exact current PR head after checking its source job and
+approval. Provenance distinguishes the built revision from the PR head and
+source-check revision.
 
-## Blacksmith activation prerequisites
+## CI backends and activation
 
-Activation requires a verified ephemeral runner with the complete pinned
-HDK/IP/shell/toolchain installation and a valid license for its execution
-location. A standard Ubuntu runner label alone does not provide Vivado.
-Blacksmith documents `blacksmith-32vcpu-ubuntu-2404` with 32 vCPUs, 128 GB RAM,
-and 1.5 TB disk; actual available disk, memory, tools, and license features
-must still pass preflight. See the [runner specifications][runners].
+The source job runs on Blacksmith for every PR and validates the build, physical
+test runner, controller, host runtime and immutable image helpers. It receives
+no AWS credentials or OIDC permission. `FPGA_CI_BACKEND` selects the build route:
 
-Off-AWS Vivado requires an appropriate ML Enterprise license with
-`EncryptedWriter_v2` and Partial Reconfiguration support. Do not copy an AWS
-FPGA developer-AMI license to Blacksmith. See the [AWS licensing guide][license].
-An alternative is an isolated AWS FPGA developer-AMI build host orchestrated
-by Blacksmith; it needs an explicitly approved budget and narrowly scoped
-permissions before implementation. F2 hardware is only needed for physical
-execution, not checkpoint generation. See the [AWS development guide][aws].
-
-After those prerequisites and spending limits are approved and verified,
-configure repository variables to identify the actual installation:
-
-| Variable | Required value |
+| Backend | Behavior and required variables |
 | --- | --- |
-| `FPGA_BUILD_ENABLED` | `true` after provisioning and approval |
-| `FPGA_BLACKSMITH_RUNNER` | Verified ephemeral Blacksmith runner label |
-| `FPGA_HDK_ROOT` | Installed, pinned HDK directory on that runner |
-| `FPGA_VIVADO_SETTINGS` | Installed Vivado 2025.2 `settings64.sh` path |
+| `source-only` (default) | Runs source checks, then reports disabled readiness and no checkpoint. |
+| `direct` | Requires `FPGA_BUILD_ENABLED=true`, `FPGA_BLACKSMITH_RUNNER`, `FPGA_HDK_ROOT` and `FPGA_VIVADO_SETTINGS`; blocks forks. |
+| `ssm` | Requires `FPGA_SSM_ENABLED=true` after live qualification, plus the trusted-main controller and its nonsecret `FPGA_CI_CONFIG_JSON`. |
 
-No variable or credential is provisioned by this PR. Never put a license,
-credential, private endpoint, or host/account identifier in these sources.
-PR code can modify workflow files and build scripts: YAML fork checks alone
-are not a credential boundary. Enforce access and isolation outside PR code;
-do not expose persistent host credentials, license material, trusted writable
-tool caches, or unrelated files. Do not use `pull_request_target` to execute
-untrusted source with credentials. Forks receive source checks and an explicit
-blocked build result; a maintainer must review their source before using a
-licensed builder.
+A standard Ubuntu runner label does not provide Vivado. Direct mode requires an
+approved ephemeral installation with all pins, sufficient CPU/RAM/disk and valid
+licenses for that location. Blacksmith documents a 32-vCPU / 128-GB / 1.5-TB
+runner; actual free resources and licensed features must pass preflight. See
+the [runner specifications][runners] and [AWS licensing guide][license]. Do not
+copy developer-AMI license material to another execution location.
 
-Each PR update requests a fresh build of the latest proposed merge commit.
-A newer update cancels older work for that same PR. Different PR builds share
-one licensed-build concurrency group with up to 100 pending jobs, using
-GitHub's documented [`queue: max`][queue]. Beyond that limit GitHub cancels
-additional jobs; retry after the queue drains. The build timeout is six hours.
-No sticky disks or shared mutable tool caches are configured. A provider-side
-budget and runner allocation limit are required before activation.
+The SSM route keeps the controller on trusted `main`. It resolves the source
+workflow and named successful source job through GitHub, checks the current PR
+head and permissions, then submits only the fixed version/hash of one custom
+SSM document. Same-repository writers are eligible; forks and non-writers need
+a current maintainer approval of the exact head SHA. Effective change requests
+veto admission. These facts are checked again immediately before submission.
+PR source never executes in the credentialed controller.
 
-Artifacts have commit/run/attempt-specific names, seven-day retention, and
-include the tar only after qualification succeeds. Failed builds retain
-available logs and validation evidence. Missing artifact paths are failures.
-Public-repository Actions logs and artifacts must be treated as public output;
-keep all operational secrets out of the runner environment and tool logs.
+The root launcher validates the canonical request, holds the shared host lock,
+and requires an explicit scheduling permit. Its durable pilot ledger admits at
+most three builds, serially, each with a six-hour deadline. Resource limits cover
+all helpers and private engines: 16 CPUs, 64 GiB, 4096 tasks, and a hard 250-GiB /
+2,000,000-inode storage pool. Local tests exercise these policies; actual Linux
+enforcement must be measured before activation.
 
-## Reusing an existing F2 builder
+The immutable staging helper fetches only the exact public Git revision over a
+separately qualified restricted network. Build, validation and collection use
+network none. Containers have no metadata access, host credentials, FPGA
+devices, host sockets or colleague mounts. A separate root watchdog enforces
+the absolute deadline even if the launcher or Docker becomes unresponsive.
+Cancellation uses the same fixed SSM document and exact durable request identity.
 
-An existing F2 developer host can run the same build entrypoint after access and
-isolation are approved. Keep all temporary files, caches, and outputs on its
-allocated build disk and serialize work with the host's other operators. Build
-jobs must never load the FPGA or stop the shared instance.
+Only after untrusted processes stop does root seal the bounded fixed-name files
+and publish them through a write-only artifact role. The controller can retrieve
+only that approved prefix and verifies receipt identity, sizes and hashes. The
+host profile is host-wide; proving that guests cannot obtain it is mandatory.
+Failed qualification cannot produce a deployable receipt.
 
-The shortest activation route is a trusted Blacksmith orchestrator on protected
-`main`, GitHub OIDC, and a custom SSM document that invokes a root-owned fixed
-launcher on the exact approved host. This requires separate approval for the
-OIDC role, a minimal SSM instance profile, the custom document, and host account
-isolation. The orchestrator needs command access to only that instance/document
-and narrowly scoped artifact storage; it needs no EC2 lifecycle permissions.
-The current workflow does not create these resources or claim this route is live.
+See [the controller/runtime runbook](ci/README.md), [host contract](ci/host/CONTRACT.md)
+and [activation acceptance criteria](ci/ACCEPTANCE.md). The checked-in example
+configuration is disabled and unapproved. Operator configuration, IAM resource
+identifiers and evidence belong outside this public repository. No repository
+variable, IAM resource, service or private engine is installed by these sources.
 
-The launcher must validate the repository, exact reviewed commit SHA, and run ID.
-Run PR code as an unprivileged account in a bounded container with no Docker
-socket, host networking, FPGA devices, colleague directories, host credentials,
-or metadata-service access. Use read-only tool mounts, one host lock, a six-hour
-process deadline, and cleanup that survives workflow cancellation. Do not give
-CI an existing developer's sudo-capable SSH identity. Public-fork execution on a
-shared developer host requires a stronger verified isolation boundary; begin
-with maintainer-approved exact SHAs and invalidate approval after each push.
+Activation requires independent evidence for the private Docker and containerd
+installation, bounded storage, sealed tool/dependency snapshots, actual image
+digest, offline license checkout, restricted staging egress, metadata isolation,
+aggregate cgroups, watchdog/cancellation and coordination with physical users.
+Verify the actual trusted-main OIDC subject and pin the installed SSM document.
+Do not change flags to bypass a failed prerequisite. A main merge and operational
+activation are separate decisions from opening this source PR.
+
+Every PR update requests a fresh eligible build after activation. Direct builds
+share a licensed-runner queue; trusted controller runs share a separate queue.
+Both use GitHub's documented [`queue: max`][queue] limit of 100 pending jobs. The
+three-admission pilot cap remains authoritative even when a queue contains more
+requests. Artifacts use unique run/attempt names and seven-day retention; a tar
+is published only after strict timing, DRC and provenance checks pass.
+
+Public Actions logs and artifacts must be treated as public output. Keep secrets,
+license material, private endpoints and host/account identifiers out of source,
+workflow logs and build evidence. Do not execute untrusted PR code with
+credentials through `pull_request_target`.
 
 ## Physical tests
 
