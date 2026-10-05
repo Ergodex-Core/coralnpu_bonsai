@@ -241,22 +241,22 @@ int cm_init(cm_state *s, const void *image, uint32_t image_bytes, void *workspac
   float logbase = cm_log(h->rope_theta), low = 0, high = 0;
   s->rope_magnitude = 1;
   if (h->flags & CM_YARN) {
-    low = (float)(int)((float)h->head_dim *
-                       cm_log(h->rope_original_context / (h->yarn_beta_fast * 6.28318530718f)) /
-                       (2 * logbase));
-    /* floor/ceil expressed without libc; correction dimensions can be negative. */
+    /* Clamp finite correction dimensions before integer conversion. */
     float raw = (float)h->head_dim *
                 cm_log(h->rope_original_context / (h->yarn_beta_fast * 6.28318530718f)) /
                 (2 * logbase);
-    if (low > raw)
-      low -= 1;
+    if (!finite(raw))
+      return CM_BAD_CONFIG;
+    raw = clamp(raw, 0, (float)h->head_dim - 1);
+    low = (float)(int)raw;
     raw = (float)h->head_dim *
           cm_log(h->rope_original_context / (h->yarn_beta_slow * 6.28318530718f)) / (2 * logbase);
+    if (!finite(raw))
+      return CM_BAD_CONFIG;
+    raw  = clamp(raw, 0, (float)h->head_dim - 1);
     high = (float)(int)raw;
     if (high < raw)
       high += 1;
-    low  = clamp(low, 0, (float)h->head_dim - 1);
-    high = clamp(high, 0, (float)h->head_dim - 1);
     /* yarn_attention_factor is the FINAL multiplier, explicitly resolved by
      * the packager/reference. Do not multiply by a hidden log(factor) default. */
     s->rope_magnitude = h->yarn_attention_factor;

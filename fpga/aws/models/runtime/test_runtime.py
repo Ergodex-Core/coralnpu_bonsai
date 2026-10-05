@@ -490,6 +490,46 @@ class RuntimeTests(unittest.TestCase):
             ), 7
         )
 
+    def test_yarn_derived_dimensions_are_bounded_before_integer_cast(self):
+        image, cfg, _ = fixture(3, yarn=True)
+        near_one = struct.unpack('<f', struct.pack('<I', 0x3f800001))[0]
+        maximum = struct.unpack('<f', struct.pack('<I', 0x7f7fffff))[0]
+
+        def initialize(theta, context, fast, slow):
+            data = bytearray(image)
+            # CORALM01's fixed header stores these four FP32 parameters here.
+            for offset, value in ((64, theta), (76, context), (80, fast),
+                                  (84, slow)):
+                struct.pack_into('<f', data, offset, value)
+            blob = C.create_string_buffer(bytes(data))
+            size = self.lib.cm_workspace_bytes(blob, 3)
+            self.assertGreater(size, 0)
+            work = (C.c_float * (size // 4))()
+            state = State()
+            rc = self.lib.cm_init(
+                C.byref(state), blob, len(data), work, size, 3
+            )
+            frequencies = list(state.rope_inv[:cfg['head_dim'] // 2]) if rc == 0 else []
+            return rc, frequencies
+
+        # Both correction dimensions exceed INT_MAX but their clamped value
+        # is representable. All rotary pairs remain below the YaRN ramp.
+        rc, frequencies = initialize(near_one, 2.0**120, 32.0, 1.0)
+        self.assertEqual(rc, 0)
+        self.assertTrue(all(.9999 < f <= 1.0 for f in frequencies))
+        # Large finite negative dimensions clamp to zero; subsequent pairs
+        # receive the fixture's factor-four interpolation.
+        rc, frequencies = initialize(near_one, 1.0, 1e30, 1e29)
+        self.assertEqual(rc, 0)
+        self.assertEqual(frequencies[0], 1.0)
+        self.assertTrue(all(.2499 < f <= .25 for f in frequencies[1:]))
+        # Finite header fields can still overflow a derived ratio or product.
+        # Reject these configurations before any float-to-integer conversion.
+        for parameters in ((1e6, 8192.0, maximum, 1.0),
+                           (1e6, maximum, 32.0, 1e-38)):
+            with self.subTest(parameters=parameters):
+                self.assertEqual(initialize(*parameters)[0], 2)
+
     def test_validation_and_workspace_bounds(self):
         image, cfg, _ = fixture()
         n = self.setup_model(image)

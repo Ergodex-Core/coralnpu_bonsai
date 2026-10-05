@@ -60,6 +60,16 @@ They also accept `--tokens`, `--max-new-tokens`, `--capacity`, and explicit
 
 ## Native comparison and failure diagnostics
 
+`test_math_numerics.py` checks elementary-function ranges and special values
+against independent Decimal/FP64 goldens. The implementation assumes FP32
+round-to-nearest-even and gradual underflow, with contraction disabled.
+Exponential results extend through subnormals and true FP32 overflow; logarithm
+handles signed zero, negative arguments, infinities and subnormals. Sine/cosine
+supports finite angles in `[-4096,4096]`, preserves signed zero in sine, and
+returns quiet NaNs outside that range. Decoder angles stay within `[0,2047]`.
+IEEE exception flags and NaN payload preservation are not part of this API.
+Passing these local checks does not replace the independent full-model gate.
+
 Host-only native tests accept `CC` (default `cc`); the validation driver accepts
 `--compiler` (GCC or Clang). This does not change the strict LLVM 18.1.3 target
 firmware requirement. The driver snapshots and hashes the C sources, records
