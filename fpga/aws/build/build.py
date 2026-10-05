@@ -86,8 +86,8 @@ def source_check():
     wrapper = (AWS / "cl_coralnpu/design/cl_coralnpu.sv").read_text()
     require(".BUFGCE_DIVIDE(5)" in wrapper, "Unexpected NPU divider")
     require(
-        "parameter EN_DDR = 0" in wrapper
-        and "parameter EN_HBM = 0" in wrapper, "Memory configuration changed"
+        "parameter EN_DDR = 1" in wrapper
+        and "parameter EN_HBM = 0" in wrapper, "Expected DDR enabled / HBM disabled configuration"
     )
     require(
         "cl_axi_clock_converter_light i_host_cdc" in wrapper,
@@ -101,6 +101,12 @@ def source_check():
         "`ifdef SYNTHESIS" in (REPO / "hdl/verilog/Sram.v").read_text(),
         "Synthesizable SRAM branch missing"
     )
+    require(PINS["ddr_enabled"] and not PINS["hbm_enabled"], "Memory enable pins differ")
+    require(PINS["ddr_cpu_base"] == 0x20000000 and
+            PINS["ddr_aperture_bytes"] == 0x80000000 and
+            PINS["ddr_axi_data_bits"] == 512 and
+            PINS["ddr_axi_clock_hz"] == PINS["shell_clock_hz"],
+            "DDR address/width/clock pins differ")
     subprocess.run([
         sys.executable, "-m", "unittest", "discover", "-s",
         str(HERE), "-p", "test_*.py"
@@ -150,6 +156,8 @@ def preflight(hdk, out):
         shell / "build/checkpoints/from_aws/cl_bb_routed.small_shell.dcp",
         "clock_converter_xci": hdk /
         "hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_axi_clock_converter_light/cl_axi_clock_converter_light.xci",
+        "ddr4_xci": hdk /
+        "hdk/common/ip/cl_ip/cl_ip.srcs/sources_1/ip/cl_ddr4_32g/cl_ddr4_32g.xci",
         "build_all_tcl": shell / "build/scripts/build_all.tcl",
         "encrypt_tcl": shell / "build/scripts/encrypt.tcl",
     }
@@ -437,6 +445,19 @@ def build(args, out):
             require(marker in text, f"Simulation missing result: {marker}")
 
     stage("simulation", simulate)
+
+    def simulate_ddr():
+        # A missing simulator must not silently turn unittest SKIP into proof.
+        require(shutil.which("iverilog") and shutil.which("vvp"),
+                "DDR protocol qualification requires iverilog and vvp")
+        manifest["ddr_simulation_tools"] = {
+            name: capture([name, "-V"]) for name in ("iverilog", "vvp")
+        }
+        run([sys.executable, "-m", "unittest", "discover", "-s",
+             str(AWS / "ddr/sim"), "-p", "test_*.py", "-v"],
+            out / "logs/ddr-simulation.log", cwd=REPO, timeout=300)
+
+    stage("ddr_simulation", simulate_ddr)
     for name, flow in (("synthesis", "SynthCL"), ("implementation", "ImplCL")):
 
         def vivado_stage(name=name, flow=flow):

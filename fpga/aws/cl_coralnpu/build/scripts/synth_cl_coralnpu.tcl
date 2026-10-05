@@ -42,8 +42,9 @@ print "Reading CL IP blocks"
 
 #---- User would uncomment and/or list IPs required in their design ----
 
-## DDR IP
-# read_ip ${HDK_IP_SRC_DIR}/cl_ddr4_32g/cl_ddr4_32g.xci
+## DDR IP: the pinned controller is mandatory for the DDR-enabled wrapper.
+set_property XPM_LIBRARIES {XPM_FIFO} [current_project]
+read_ip ${HDK_IP_SRC_DIR}/cl_ddr4_32g/cl_ddr4_32g.xci
 
 ## HBM IP's
 # read_ip ${HDK_IP_SRC_DIR}/cl_hbm_mmcm/cl_hbm_mmcm.xci
