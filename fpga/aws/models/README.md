@@ -147,8 +147,8 @@ FP32, saves per-operator hashes and generates greedy tokens with persistent KV.
 It uses NumPy transcendental functions independently of target math. It is a
 validation executable, never linked to the device runner. Its synthetic tests
 compare all three formats with separate scalar FP64 equations, verify repeated
-runs and exercise both EOS and length stops. Real-model generation remains
-NOT_RUN at this source handoff.
+runs and exercise both EOS and length stops. Full-checkpoint Coral generation
+remains NOT_RUN. CPU validation and target execution are separate evidence.
 
 Use an isolated environment with `numpy==2.4.2` and `tokenizers==0.22.2`.
 The tokenizer helper pins the Qwen tokenizer JSON; when `--bonsai-gguf` is
@@ -166,7 +166,17 @@ python fpga/aws/models/cpu_reference.py /tmp/bonsai-package/manifest.json --toke
 python -m unittest discover -s fpga/aws/models -p 'test_*.py' -v
 ```
 
+Each invocation also writes `OUTPUT.logits.f32` with one complete little-endian
+FP32 row per emitted token (one final-prompt row for `--max-new-tokens 0`). The
+JSON records its SHA256 and relative path. Supply that file and hash to the
+hardware runner's `--reference-logits` and `--reference-sha256`. Early EOS
+shortens the file to the emitted count. `--logits-output` overrides the path;
+`--trace-dir` retains all operator vectors for the separate native comparison.
+
 Repeat on the second prompt, repeat each case, decode IDs with the same helper's
 `--decode-ids`, and compare target per-layer values/logits/generated IDs against
 fresh reference outputs. A CPU reference token sequence alone does not qualify
-Coral. No real-model CPU run was started during the source handoff.
+Coral. The prior full-Qwen operator comparison failed the unchanged normalized
+`3e-5` budget despite matching generated IDs. Retain that failure until fresh
+full-checkpoint evidence explains it; separate looser logit diagnostics do not
+override the operator gate.

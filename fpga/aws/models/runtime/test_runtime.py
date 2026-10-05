@@ -8,6 +8,7 @@ are generated locally, with no downloaded weights or tensor-framework runtime.
 import ctypes as C
 import json
 import math
+import os
 from pathlib import Path
 import random
 import struct
@@ -304,12 +305,13 @@ class RuntimeTests(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory(prefix='coral-decoder-')
         so = Path(cls.tmp.name) / 'decoder.so'
         subprocess.run([
-            'clang', '-shared', '-fPIC', '-O2', '-std=c11', '-Wall', '-Wextra',
-            '-Werror', '-ffp-contract=off', '-fno-fast-math',
+            os.environ.get('CC', 'cc'), '-shared', '-fPIC', '-O2', '-std=c11',
+            '-Wall', '-Wextra', '-Werror', '-ffp-contract=off',
+            '-fno-fast-math',
             str(HERE / 'decoder.c'),
             str(HERE / 'math.c'),
             str(HERE / 'generate.c'), '-o',
-            str(so)
+            str(so), '-lm'
         ],
                        check=True)
         cls.lib = C.CDLL(str(so))

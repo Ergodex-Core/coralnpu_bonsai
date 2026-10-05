@@ -54,6 +54,42 @@ absolute <2.5e-4 through position 4096 (tested beyond the supported 2048 cap).
 Tiny model normalized error must be <3e-5. These are synthetic host tests, not
 full-checkpoint or target execution evidence. Core simulation fixtures contain
 independent golden readback checks and can select early EOS with `--eos-first`.
+They also accept `--tokens`, `--max-new-tokens`, `--capacity`, and explicit
+`--eos` IDs. A prompt-only fixture uses zero new tokens; a request must satisfy
+`prompt_count + max(0, max_new_tokens - 1) <= capacity <= 2048`.
+
+## Native comparison and failure diagnostics
+
+Host-only native tests accept `CC` (default `cc`); the validation driver accepts
+`--compiler` (GCC or Clang). This does not change the strict LLVM 18.1.3 target
+firmware requirement. The driver snapshots and hashes the C sources, records
+the native compiler/library identity, and saves complete prediction rows. A
+trace write failure or source mutation fails the run.
+
+```bash
+python3 fpga/aws/models/runtime/run_native.py /tmp/qwen-package/manifest.json \
+  --tokens 9707 --max-new-tokens 4 --eos 151645,151643 --compiler cc \
+  --trace --output /tmp/qwen-native
+python3 fpga/aws/models/cpu_reference.py /tmp/qwen-package/manifest.json \
+  --tokens 9707 --max-new-tokens 4 --eos 151645,151643 \
+  --trace-dir /tmp/qwen-reference/trace --output /tmp/qwen-reference/report.json
+python3 fpga/aws/models/runtime/compare_native.py /tmp/qwen-native/report.json \
+  /tmp/qwen-reference/report.json --normalized-tolerance 3e-5 \
+  --output /tmp/qwen-comparison.json
+```
+
+The comparator validates complete operator inventories, vector hashes,
+prediction files, prompt/profile identity, stopping behavior, and greedy IDs.
+It reports the first bitwise divergence and first failed vector in execution
+order. Its strict gate is `abs(native-reference)/(1+abs(reference)) < 3e-5`.
+The separately labeled `1e-4` logit diagnostic never changes that gate's result.
+For hardware comparisons preserving the `3e-5` budget, explicitly set both
+`--atol 3e-5 --rtol 3e-5`; the host runner's documented defaults are different.
+
+Use the same commands with the native PQ2 Bonsai package and pinned YaRN
+profile, and cover varied prompts, repeats, EOS, and cached decode. These
+programs are validation executables and are never called by the FPGA host
+runner. CPU wall times are not FPGA TTFT or tokens/second.
 
 ## Request ABI v2
 
