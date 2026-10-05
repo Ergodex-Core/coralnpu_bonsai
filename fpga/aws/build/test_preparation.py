@@ -4,10 +4,29 @@ import tempfile
 import unittest
 import zipfile
 
-from build import prepare_rtl, validate_parameters
+from build import prepare_rtl, validate_parameters, validate_vivado_version
 
 
 class PreparationTest(unittest.TestCase):
+
+    def test_vivado_cli_version_is_case_insensitive_but_exact(self):
+        text = "Vivado v2025.2 (64-bit)\nSW Build 6299465 on Fri Nov 14\nIP Build 6299950\n"
+        for spelling in (text, text.replace("Vivado", "vivado"), text.lower()):
+            self.assertEqual(
+                validate_vivado_version(spelling), {
+                    "version": "2025.2",
+                    "build": "6299465"
+                }
+            )
+        for bad in (text.replace("2025.2", "2025.20"), text.replace("2025.2",
+                                                                    "2025.1"),
+                    text.replace("6299465",
+                                 "62994650"), text.replace("SW Build",
+                                                           "IP Build"),
+                    text + "Vivado v2025.1 (64-bit)\n",
+                    text + "SW Build 6299465\n", ""):
+            with self.subTest(text=bad), self.assertRaises(RuntimeError):
+                validate_vivado_version(bad)
 
     def test_hardware_configuration_is_bound_to_the_generated_parameters(self):
         values = dict(

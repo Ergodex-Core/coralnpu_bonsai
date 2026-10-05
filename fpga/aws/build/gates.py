@@ -26,9 +26,29 @@ def require(condition, message, metrics=None):
         raise EvidenceError(message, metrics)
 
 
+def _messages(log, severity):
+    # The pinned HDK print procedure prefixes messages with AWS FPGA and %T.
+    prefix = r'^\s*(?:AWS FPGA:\s*\(\d{2}:\d{2}:\d{2}\):\s*)?'
+    return re.findall(prefix + re.escape(severity) + r':[^\n]*$', log, re.M)
+
+
+def _ddr_calibration(facts):
+    require(
+        facts.get('ddr.calibration_bram_cells') == '1',
+        'Expected exactly one DDR calibration BRAM'
+    )
+    value = facts.get('ddr.calibration_init_2c', '')
+    match = re.fullmatch(r"256'h([0-9a-fA-F]{64})", value)
+    require(
+        match is not None and int(match[1], 16) != 0,
+        'DDR calibration INIT_2C missing, malformed or zero'
+    )
+    return value
+
+
 def validate_stage(log: str, stage: str):
     require(re.fullmatch(r'[A-Za-z_]+', stage), 'Invalid stage name')
-    require(not re.search(r'^\s*ERROR:', log, re.M), f'{stage}: emitted ERROR')
+    require(not _messages(log, 'ERROR'), f'{stage}: emitted ERROR')
     marker = f'CORAL_STAGE_{stage.upper()}_PASSED'
     require(
         len(re.findall(rf'^{marker}\s*$', log, re.M)) == 1,
@@ -342,12 +362,14 @@ def qualify(
             )
             require(path is not None, 'Missing stage log')
             text = Path(path).read_text()
-            warnings = re.findall(r'^\s*CRITICAL WARNING:.*$', text, re.M)
+            warnings = _messages(text, 'CRITICAL WARNING')
             if warnings:
                 result['blockers'].append(
                     f'{stage}: Unreviewed critical warnings: {warnings}'
                 )
             validate_stage(text, stage)
+            if stage == 'synthesis' and pins.get('ddr_enabled'):
+                validate_stage(text, 'ddr_calibration')
             if stage == 'implementation':
                 for part in ('link', 'optimization', 'placement',
                              'physical_optimization', 'routing'):
@@ -380,6 +402,8 @@ def qualify(
                 float(facts[key]) == expected,
                 f'Unexpected {key}: {facts[key]}'
             )
+        if pins.get('ddr_enabled'):
+            _ddr_calibration(facts)
         return facts
 
     result['metrics']['facts'] = inspect('facts', facts_check)
