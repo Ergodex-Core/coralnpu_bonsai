@@ -1,0 +1,198 @@
+{
+  "base_commit": "e31b11ebc32fa205a39ae1a19d5e86a4dd60bc54",
+  "local_subset_commits": [
+    "a96536d75470e6b601c3f804c6c62540c8c27088",
+    "57baa57114faaca3b7273b1ba1130fb141970460"
+  ],
+  "publication_commits": [
+    "c2899e94f53466fcd2d9c7ea303b21a8e6ba857e",
+    "ed4f345314c873771bd5ecf5557e59d294bbbbdf"
+  ],
+  "pr2_observed_preserved": "3d5a14215de3fe47a82f6e18fd883d1001dc0920",
+  "validation": {
+    "unit_regression_tests_passed": 64,
+    "small_probe_native_exit": 0,
+    "strict_llvm18_compile": "NOT_RUN",
+    "simulation": "NOT_RUN",
+    "physical": "NOT_RUN"
+  },
+  "model": {
+    "repository": "Qwen/Qwen3-0.6B-GGUF",
+    "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+    "file": "Qwen3-0.6B-Q8_0.gguf",
+    "bytes": 639446688,
+    "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"
+  },
+  "cases": {
+    "hello": {
+      "case": "hello",
+      "native_tokens": [
+        1479,
+        198,
+        40,
+        1184
+      ],
+      "reference_tokens": [
+        1479,
+        198,
+        40,
+        1184
+      ],
+      "gate_pass": true,
+      "worst": {
+        "key": "2:27:attention",
+        "values": 2048,
+        "pass": true,
+        "nonzero_values": 922,
+        "strict_failing_values": 0,
+        "max_normalized_error": 1.7813859420147e-06,
+        "nonfinite_values": 0,
+        "worst_index": 192,
+        "actual": -0.003792881965637207,
+        "reference": -0.0037910938262939453
+      },
+      "first_failure": null,
+      "vectors": 1012,
+      "values": 2328064,
+      "controls": {
+        "repeat": {
+          "pass": true,
+          "logits_bytes_equal": true,
+          "generated_ids": [
+            1479,
+            198,
+            40,
+            1184
+          ],
+          "generation_seconds": 3.5827070570003343
+        },
+        "forced_eos": {
+          "pass": true,
+          "report": {
+            "return_code": 0,
+            "generated_ids": [
+              1479
+            ],
+            "generated_count": 1,
+            "completed_tokens": 1,
+            "state_position": 1,
+            "stop_reason": 2,
+            "last_argmax": 1479,
+            "generation_seconds": 0.8812507039992852,
+            "workspace_bytes": 7401856,
+            "callback_errors": []
+          }
+        }
+      },
+      "native_seconds": 3.6723901249997652,
+      "reference_seconds": 4.770112984999287
+    },
+    "france": {
+      "case": "france",
+      "native_tokens": [
+        12095,
+        13,
+        576,
+        6722
+      ],
+      "reference_tokens": [
+        12095,
+        13,
+        576,
+        6722
+      ],
+      "gate_pass": false,
+      "worst": {
+        "key": "7:27:layer",
+        "values": 1024,
+        "pass": false,
+        "nonzero_values": 1024,
+        "strict_failing_values": 1024,
+        "max_normalized_error": 0.5868922444952577,
+        "nonfinite_values": 0,
+        "worst_index": 24,
+        "actual": 0.9511260986328125,
+        "reference": 0.22952651977539062
+      },
+      "first_failure": {
+        "key": "4:5:layer",
+        "values": 1024,
+        "pass": false,
+        "nonzero_values": 1021,
+        "strict_failing_values": 25,
+        "max_normalized_error": 3.7379479478966096e-05,
+        "nonfinite_values": 0,
+        "worst_index": 797,
+        "actual": -0.2899686098098755,
+        "reference": -0.2900168299674988
+      },
+      "vectors": 2024,
+      "values": 4656128,
+      "controls": {
+        "repeat": {
+          "pass": true,
+          "logits_bytes_equal": true,
+          "generated_ids": [
+            12095,
+            13,
+            576,
+            6722
+          ],
+          "generation_seconds": 7.326435703999778
+        },
+        "forced_eos": {
+          "pass": true,
+          "report": {
+            "return_code": 0,
+            "generated_ids": [
+              12095
+            ],
+            "generated_count": 1,
+            "completed_tokens": 5,
+            "state_position": 5,
+            "stop_reason": 2,
+            "last_argmax": 12095,
+            "generation_seconds": 4.47050673800004,
+            "workspace_bytes": 7401856,
+            "callback_errors": []
+          }
+        }
+      },
+      "native_seconds": 7.555374751000272,
+      "reference_seconds": 10.14143700799923
+    }
+  },
+  "first_failure_diagnosis": {
+    "first_discontinuity": "position4 layer5 DOWN activation block51 binary16 scale",
+    "midpoint_exact": 0.0022859573364257812,
+    "gate_input_bitexact": true,
+    "up_input_bitexact": true,
+    "max_activated_difference": 5.960464477539063e-08,
+    "matched_input_checks": [
+      {
+        "input": "native_input",
+        "full_down_matvec_same_input_bitexact": true,
+        "values": 1024,
+        "block": 51,
+        "max_element": 22,
+        "amax": 0.2903166115283966,
+        "unrounded_scale_fp32": 0.002285957569256425,
+        "stored_scale_fp16": 0.0022869110107421875,
+        "stored_scale_bits": 6319
+      },
+      {
+        "input": "numpy_input",
+        "full_down_matvec_same_input_bitexact": true,
+        "values": 1024,
+        "block": 51,
+        "max_element": 22,
+        "amax": 0.29031655192375183,
+        "unrounded_scale_fp32": 0.0022859571035951376,
+        "stored_scale_fp16": 0.002285003662109375,
+        "stored_scale_bits": 6318
+      }
+    ],
+    "conclusion": "Tiny SiLU/input rounding straddles a binary16-scale midpoint; both implementations produce bit-identical Q8 matvec outputs on either identical supplied input. This does not establish full-model acceptance."
+  },
+  "scope": "CPU reference evidence; no full-model blanket PASS. Four prior BF16/PQ2 strict gates remain FAIL."
+}
