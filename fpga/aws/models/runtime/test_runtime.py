@@ -509,7 +509,8 @@ class RuntimeTests(unittest.TestCase):
             rc = self.lib.cm_init(
                 C.byref(state), blob, len(data), work, size, 3
             )
-            frequencies = list(state.rope_inv[:cfg['head_dim'] // 2]) if rc == 0 else []
+            frequencies = list(state.rope_inv[:cfg['head_dim'] //
+                                              2]) if rc == 0 else []
             return rc, frequencies
 
         # Both correction dimensions exceed INT_MAX but their clamped value
@@ -525,8 +526,8 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(all(.2499 < f <= .25 for f in frequencies[1:]))
         # Finite header fields can still overflow a derived ratio or product.
         # Reject these configurations before any float-to-integer conversion.
-        for parameters in ((1e6, 8192.0, maximum, 1.0),
-                           (1e6, maximum, 32.0, 1e-38)):
+        for parameters in ((1e6, 8192.0, maximum, 1.0), (1e6, maximum, 32.0,
+                                                         1e-38)):
             with self.subTest(parameters=parameters):
                 self.assertEqual(initialize(*parameters)[0], 2)
 

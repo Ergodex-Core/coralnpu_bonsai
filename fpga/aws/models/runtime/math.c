@@ -50,8 +50,8 @@ float cm_log(float x) {
   union {
     uint32_t u;
     float f;
-  } v   = {0};
-  v.f = x;
+  } v                = {0};
+  v.f                = x;
   uint32_t magnitude = v.u & 0x7fffffffu;
   if (magnitude > 0x7f800000u)
     return x + x; /* Quiet a NaN without interpreting its exponent. */
@@ -67,7 +67,7 @@ float cm_log(float x) {
     return x;
   int correction = 0;
   if (magnitude < 0x00800000u) {
-    v.f = x * 0x1p23f; /* Exact normalization, including the least subnormal. */
+    v.f        = x * 0x1p23f; /* Exact normalization, including the least subnormal. */
     correction = -23;
   }
   int e = (int)(v.u >> 23) - 127 + correction;

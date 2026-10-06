@@ -22,7 +22,9 @@ import tempfile
 import unittest
 
 HERE = Path(__file__).resolve().parent
-PI = Decimal('3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628')
+PI = Decimal(
+    '3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628'
+)
 
 
 def fp32(value):
@@ -50,9 +52,13 @@ def neighbors(value):
 
 
 def ulps(actual, expected):
+
     def ordered(value):
         raw = bits(value)
-        return 0x80000000 - (raw & 0x7fffffff) if raw >> 31 else 0x80000000 + raw
+        return 0x80000000 - (
+            raw & 0x7fffffff
+        ) if raw >> 31 else 0x80000000 + raw
+
     return abs(ordered(actual) - ordered(expected))
 
 
@@ -87,25 +93,37 @@ def decimal_sincos(value):
 
 
 class MathNumericsTests(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
-        compiler = os.environ.get('CC') or shutil.which('gcc') or shutil.which('clang')
+        compiler = os.environ.get('CC') or shutil.which('gcc') or shutil.which(
+            'clang'
+        )
         if not compiler:
-            raise RuntimeError('GCC or Clang is required for native math regressions')
+            raise RuntimeError(
+                'GCC or Clang is required for native math regressions'
+            )
         cls.tmp = tempfile.TemporaryDirectory(prefix='coral-math-regression-')
         cls.addClassCleanup(cls.tmp.cleanup)
         library = Path(cls.tmp.name) / 'math.so'
         subprocess.run([
-            compiler, '-shared', '-fPIC', '-O2', '-std=c11', '-Wall', '-Wextra',
-            '-Werror', '-fno-fast-math', '-ffp-contract=off', str(HERE / 'math.c'),
-            '-o', str(library), '-lm'
-        ], check=True, capture_output=True, text=True)
+            compiler, '-shared', '-fPIC', '-O2', '-std=c11', '-Wall',
+            '-Wextra', '-Werror', '-fno-fast-math', '-ffp-contract=off',
+            str(HERE / 'math.c'), '-o',
+            str(library), '-lm'
+        ],
+                       check=True,
+                       capture_output=True,
+                       text=True)
         cls.lib = C.CDLL(str(library))
         for name in ('cm_exp', 'cm_log'):
             function = getattr(cls.lib, name)
             function.argtypes = [C.c_float]
             function.restype = C.c_float
-        cls.lib.cm_sincos.argtypes = [C.c_float, C.POINTER(C.c_float), C.POINTER(C.c_float)]
+        cls.lib.cm_sincos.argtypes = [
+            C.c_float, C.POINTER(C.c_float),
+            C.POINTER(C.c_float)
+        ]
         cls.lib.cm_sincos.restype = None
 
     def sincos(self, value):
@@ -141,7 +159,8 @@ class MathNumericsTests(unittest.TestCase):
 
     def test_exp_normal_and_overflow_boundaries(self):
         values = [fp32(i / 4) for i in range(-349, 355)]
-        for value in (-87.3, -87.0, 0.0, 88.0, 88.5, 88.72, 88.72283905206835, 89.0):
+        for value in (-87.3, -87.0, 0.0, 88.0, 88.5, 88.72, 88.72283905206835,
+                      89.0):
             values.extend(neighbors(value))
         values.append(from_bits(0x7f7fffff))
         for value in values:
@@ -161,19 +180,24 @@ class MathNumericsTests(unittest.TestCase):
         for value in (0.0, -0.0):
             with self.subTest(x=value):
                 self.assertEqual(self.lib.cm_log(value), -math.inf)
-        for value in (-from_bits(1), -1.0, -from_bits(0x7f7fffff), -math.inf, math.nan):
+        for value in (-from_bits(1), -1.0, -from_bits(0x7f7fffff), -math.inf,
+                      math.nan):
             with self.subTest(x=value):
                 self.assertTrue(math.isnan(self.lib.cm_log(value)))
         self.assertEqual(self.lib.cm_log(math.inf), math.inf)
         self.assertEqual(bits(self.lib.cm_log(1.0)), bits(0.0))
 
     def test_log_subnormals_exponents_and_near_one(self):
-        raw_values = {1, 2, 3, 0x003fffff, 0x00400000, 0x007ffffe, 0x007fffff,
-                      0x00800000, 0x00800001, 0x7f7ffffe, 0x7f7fffff}
+        raw_values = {
+            1, 2, 3, 0x003fffff, 0x00400000, 0x007ffffe, 0x007fffff,
+            0x00800000, 0x00800001, 0x7f7ffffe, 0x7f7fffff
+        }
         # All exponent bins, varied mantissas, and adjacent floats at powers of two.
         for exponent in range(1, 255):
             raw = exponent << 23
-            raw_values.update((raw - 1, raw, raw + 1, raw | 0x123456, raw | 0x654321))
+            raw_values.update(
+                (raw - 1, raw, raw + 1, raw | 0x123456, raw | 0x654321)
+            )
         raw_values.update(0x3f800000 + delta for delta in range(-32, 33))
         for raw in sorted(raw_values):
             value = from_bits(raw)
@@ -199,8 +223,9 @@ class MathNumericsTests(unittest.TestCase):
 
     def test_sincos_rejects_outside_supported_domain(self):
         outside = from_bits(bits(4096.0) + 1)
-        for value in (outside, -outside, 4097.0, -4097.0, from_bits(0x7f7fffff),
-                      -from_bits(0x7f7fffff), math.inf, -math.inf, math.nan):
+        for value in (outside, -outside, 4097.0, -4097.0,
+                      from_bits(0x7f7fffff), -from_bits(0x7f7fffff), math.inf,
+                      -math.inf, math.nan):
             sn, cs = self.sincos(value)
             with self.subTest(x=value):
                 self.assertTrue(math.isnan(sn) and math.isnan(cs))
@@ -211,27 +236,40 @@ class MathNumericsTests(unittest.TestCase):
         for i in range(-16384, 16385):
             value = i / 4
             actual = self.sincos(value)
-            error = max(abs(actual[0] - math.sin(value)), abs(actual[1] - math.cos(value)))
+            error = max(
+                abs(actual[0] - math.sin(value)),
+                abs(actual[1] - math.cos(value))
+            )
             if not all(map(math.isfinite, actual)):
                 error = math.inf
             if error > worst[0]:
                 worst = (error, value)
-        self.assertLess(worst[0], 1e-6, f'worst absolute error at x={worst[1]}')
+        self.assertLess(
+            worst[0], 1e-6, f'worst absolute error at x={worst[1]}'
+        )
 
     def test_sincos_quadrant_float_neighbors(self):
         worst = (0.0, None)
         for quadrant in range(-2607, 2608):
             for value in neighbors(quadrant * math.pi / 2):
                 actual = self.sincos(value)
-                error = max(abs(actual[0] - math.sin(value)), abs(actual[1] - math.cos(value)))
+                error = max(
+                    abs(actual[0] - math.sin(value)),
+                    abs(actual[1] - math.cos(value))
+                )
                 if not all(map(math.isfinite, actual)):
                     error = math.inf
                 if error > worst[0]:
                     worst = (error, value)
-        self.assertLess(worst[0], 1e-6, f'worst absolute error at x={worst[1]}')
+        self.assertLess(
+            worst[0], 1e-6, f'worst absolute error at x={worst[1]}'
+        )
 
     def test_sincos_decimal_goldens(self):
-        values = {-4096.0, 4096.0, -2047.0, 2047.0, -from_bits(1), from_bits(1)}
+        values = {
+            -4096.0, 4096.0, -2047.0, 2047.0, -from_bits(1),
+            from_bits(1)
+        }
         for quadrant in (0, 1, 2, 3, 7, 16, 63, 128, 511, 1024, 2047, 2607):
             for sign in (-1, 1):
                 values.update(neighbors(sign * quadrant * math.pi / 2))

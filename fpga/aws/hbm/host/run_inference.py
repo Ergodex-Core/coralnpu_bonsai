@@ -103,7 +103,9 @@ class Plan:
         if len(header) != 128 or header[:8] != b'CORALM01':
             raise ValueError('model binary magic/header mismatch')
         header_words = struct.unpack_from('<14I', header, 8)
-        if (header_words[0] not in (1, 2) or header_words[1:3] != (128, self.model_bytes)) or not 0 < header_words[3] <= 4096 or header_words[4] != 128:
+        if (header_words[0] not in (1, 2)
+                or header_words[1:3] != (128, self.model_bytes)
+            ) or not 0 < header_words[3] <= 4096 or header_words[4] != 128:
             raise ValueError('invalid model header geometry')
         if 128 + 32 * header_words[3] > self.model_bytes or any(header[92:128]
                                                                 ):
@@ -412,7 +414,9 @@ def execute(
     while True:
         status = device.read(CSR + 8)
         if status & 2:
-            raise AssertionError('CoralNPU core fault; mailbox read deferred until reset/halt and drain')
+            raise AssertionError(
+                'CoralNPU core fault; mailbox read deferred until reset/halt and drain'
+            )
         check_ddr(device)
         if status & 1:
             break
@@ -669,9 +673,13 @@ def main(argv=None):
             'slot must be nonnegative; SDK timeout (0,60]; load/run timeout (0,86400]'
         )
     if args.atol != 3e-5 or args.rtol != 3e-5:
-        parser.error('HBM diagnostic retains the strict3e-5 gate; tolerances cannot be changed')
+        parser.error(
+            'HBM diagnostic retains the strict3e-5 gate; tolerances cannot be changed'
+        )
     if args.execute_hardware and args.reference_logits is None:
-        parser.error('first model execution requires saved pinned-reference logits')
+        parser.error(
+            'first model execution requires saved pinned-reference logits'
+        )
     if args.execute_hardware and not (args.expected_agfi
                                       and args.expected_shell):
         parser.error(
@@ -689,7 +697,9 @@ def main(argv=None):
         physical_execution='NOT_RUN',
         reference_check='NOT_RUN'
     )
-    report['validation_scope'] = 'final logits/tokens and protocol; internal operator traces NOT_CAPTURED'
+    report[
+        'validation_scope'
+    ] = 'final logits/tokens and protocol; internal operator traces NOT_CAPTURED'
     device, lockfd = None, None
     try:
         if args.tokens_json.stat().st_size > 64 * 1024:

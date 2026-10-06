@@ -78,8 +78,8 @@ def main(argv=None):
         raise ValueError('package hash/size mismatch')
     sources = [HERE / n for n in ('decoder.c', 'math.c', 'generate.c')]
     recorded_sources = sources + [
-        HERE / 'decoder.h', HERE / 'generate.h', HERE / 'math.h', HERE / 'q8_0.h',
-        HERE.parent / 'model_format.h'
+        HERE / 'decoder.h', HERE / 'generate.h', HERE / 'math.h',
+        HERE / 'q8_0.h', HERE.parent / 'model_format.h'
     ]
     source_sha256 = {p.name: digest(p) for p in recorded_sources}
     staged = output / 'sources'

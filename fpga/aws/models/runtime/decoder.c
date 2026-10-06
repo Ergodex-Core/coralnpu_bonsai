@@ -43,7 +43,8 @@ static int finite(float x) {
 }
 static float clamp(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
 static uint32_t row_bytes(const cm_tensor *t) {
-  if (t->encoding == CM_Q8_0) return (t->cols / 32u) * 34u;
+  if (t->encoding == CM_Q8_0)
+    return (t->cols / 32u) * 34u;
   return t->encoding == CM_PQ2_0 ? (t->cols / 128u) * 34u
                                  : t->cols * (t->encoding == CM_F32 ? 4u : 2u);
 }
@@ -54,7 +55,9 @@ static float element(const unsigned char *p, uint32_t encoding, uint32_t col) {
     return as_float(u16(p + col * 2) << 16);
   if (encoding == CM_Q8_0) {
     p += (col / 32u) * 34u;
-    int q = p[2 + col % 32u]; if (q >= 128) q -= 256;
+    int q = p[2 + col % 32u];
+    if (q >= 128)
+      q -= 256;
     return half(u16(p)) * (float)q;
   }
   p += (col / 128u) * 34u;
@@ -67,7 +70,8 @@ float cm_weight(const unsigned char *image, const cm_tensor *t, uint32_t row, ui
 void cm_matvec(float *out, const unsigned char *image, const cm_tensor *t, const float *input) {
   if (t->encoding == CM_Q8_0) {
     if (!cm_q8_matvec(out, image + t->offset, t->rows, t->cols, input))
-      for (uint32_t r = 0; r < t->rows; ++r) out[r] = as_float(0x7fc00000u);
+      for (uint32_t r = 0; r < t->rows; ++r)
+        out[r] = as_float(0x7fc00000u);
     return;
   }
   uint32_t stride = row_bytes(t);
@@ -211,9 +215,9 @@ int cm_init(cm_state *s, const void *image, uint32_t image_bytes, void *workspac
   for (unsigned i = 0; i < 8; ++i)
     if (h->magic[i] != magic[i])
       return CM_BAD_IMAGE;
-  if ((h->version != CM_VERSION && h->version != CM_VERSION_Q8) ||
-      h->header_bytes != 128 || h->file_bytes != image_bytes ||
-      h->dir_offset != 128 || h->tensor_count > 1024 || h->tensor_count > (image_bytes - 128) / 32)
+  if ((h->version != CM_VERSION && h->version != CM_VERSION_Q8) || h->header_bytes != 128 ||
+      h->file_bytes != image_bytes || h->dir_offset != 128 || h->tensor_count > 1024 ||
+      h->tensor_count > (image_bytes - 128) / 32)
     return CM_BAD_IMAGE;
   for (unsigned i = 0; i < 9; ++i)
     if (h->reserved[i])

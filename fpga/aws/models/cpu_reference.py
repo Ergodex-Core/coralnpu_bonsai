@@ -33,15 +33,19 @@ class Reference:
         with path.open('rb') as source:
             self.data = mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ)
         h = HEADER.unpack_from(self.data)
-        require(h[0] == b'CORALM01' and h[1] in (1, 2)
-                and h[2:4] == (128, len(self.data)), 'bad image')
+        require(
+            h[0] == b'CORALM01' and h[1] in (1, 2)
+            and h[2:4] == (128, len(self.data)), 'bad image'
+        )
         self.c = Config(*h[6:15], *h[15:22])
         require(1 <= self.c.max_seq <= 2048, 'unsupported context')
         self.ts = {}
         for i in range(h[4]):
             t = TENSOR.unpack_from(self.data, 128 + 32 * i)
             require(t[2] != Q8 or h[1] == 2, 'Q8 requires version2')
-            require(h[1] != 2 or t[2] in (F32, Q8), 'unsupported version2 encoding')
+            require(
+                h[1] != 2 or t[2] in (F32, Q8), 'unsupported version2 encoding'
+            )
             require(t[5] + t[6] <= len(self.data), 'tensor outside image')
             self.ts[t[:2]] = t
         self.position = 0
@@ -112,7 +116,10 @@ class Reference:
             )
             return np.left_shift(x.astype(np.uint32),
                                  16).view(np.float32).reshape(count, cols)
-        require(enc in (PQ2, Q8) and cols % (128 if enc == PQ2 else 32) == 0, 'encoding')
+        require(
+            enc in (PQ2, Q8) and cols % (128 if enc == PQ2 else 32) == 0,
+            'encoding'
+        )
         group = 128 if enc == PQ2 else 32
         blocks = count * cols // group
         x = np.frombuffer(
@@ -124,7 +131,8 @@ class Reference:
         scales = x[:, :2].copy().view('<f2').astype(np.float32
                                                     ).reshape(blocks, 1)
         if enc == Q8:
-            return (x[:, 2:].copy().view(np.int8).astype(np.float32) * scales).reshape(count, cols)
+            return (x[:, 2:].copy().view(np.int8).astype(np.float32) *
+                    scales).reshape(count, cols)
         codes = ((x[:, 2:, None] >> np.array([0, 2, 4, 6], np.uint8))
                  & 3).reshape(blocks, 128).astype(np.float32) - 1
         return (codes * scales).reshape(count, cols)
@@ -156,10 +164,15 @@ class Reference:
         inverse = np.zeros_like(d)
         np.divide(np.float32(1), d, out=inverse, where=d != 0)
         scale = d.astype('<f2').astype(np.float32)
-        require(np.isfinite(inverse).all() and np.isfinite(scale).all(), 'Q8 activation scale range')
+        require(
+            np.isfinite(inverse).all() and np.isfinite(scale).all(),
+            'Q8 activation scale range'
+        )
         product = blocks * inverse[:, None]
         # roundf ties away; avoid np.rint (ties even) and float32 +0.5 double rounding.
-        codes = np.copysign(np.floor(np.abs(product).astype(np.float64) + 0.5), product).astype(np.int32)
+        codes = np.copysign(
+            np.floor(np.abs(product).astype(np.float64) + 0.5), product
+        ).astype(np.int32)
         require(np.max(np.abs(codes)) <= 127, 'Q8 activation code range')
         return scale, codes
 
@@ -170,12 +183,19 @@ class Reference:
         blocks = cols // 32
         for first in range(0, rows, 128):
             n = min(128, rows - first)
-            raw = np.frombuffer(self.data, dtype=np.uint8,
-                                count=n * blocks * 34, offset=offset + first * blocks * 34).reshape(n, blocks, 34)
-            ws = raw[:, :, :2].copy().view('<f2').reshape(n, blocks).astype(np.float32)
+            raw = np.frombuffer(
+                self.data,
+                dtype=np.uint8,
+                count=n * blocks * 34,
+                offset=offset + first * blocks * 34
+            ).reshape(n, blocks, 34)
+            ws = raw[:, :, :2].copy().view('<f2').reshape(n, blocks).astype(
+                np.float32
+            )
             wc = raw[:, :, 2:].copy().view(np.int8).astype(np.int32)
             sums = np.sum(wc * codes, axis=2, dtype=np.int32)
-            result[first:first+n] = self.total(sums.astype(np.float32) * (ws * scale))
+            result[first:first +
+                   n] = self.total(sums.astype(np.float32) * (ws * scale))
         return result
 
     def norm(self, x, role, layer):

@@ -12,6 +12,7 @@ Source tensors are streamed unchanged; no BF16 requantization occurs.
 
 The format, scalar activation equations, and integer block dot are based on
 ggml-org/llama.cpp commit8345f333951c661d166b00e6f9362e553768f292:
+
 - ggml/src/ggml-quants.c, quantize_row_q8_0_ref
 - ggml/src/ggml-cpu/quants.c, ggml_vec_dot_q8_0_q8_0_generic
 - ggml/src/ggml-cpu/arch/riscv/quants.c, ggml_vec_dot_q8_0_q8_0

@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 #include <stddef.h>
 
+#include "address_range.h"
 #include "generate.h"
 #include "mailbox.h"
-#include "address_range.h"
 volatile cm_mailbox coral_mailbox __attribute__((section(".mailbox"), aligned(64)));
 static cm_state state;
 static void fence(void) { __asm__ volatile("fence rw, rw" ::: "memory"); }
