@@ -19,6 +19,9 @@ HEADER = struct.Struct("<8s14I7f9I")
 TENSOR = struct.Struct("<8I")
 GLOBAL = 0xffffffff
 F32, BF16, PQ2 = 1, 2, 3
+Q8 = 4
+Q8_REV = '23749fefcc72300e3a2ad315e1317431b06b590a'
+Q8_SHA = '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031'
 TIED, QKNORM, YARN = 1, 2, 4
 QWEN_REV = "c1899de289a04d12100db370d81485cdf75e47ca"
 BONSAI_REV = "983b5dec2ff16aab79990711ba0f828a499a7e6a"
@@ -310,6 +313,68 @@ def qwen_sources(directory, max_seq):
     return c, tensors, provenance, "Qwen/Qwen3-0.6B", QWEN_REV
 
 
+def qwen_q8_sources(path, max_seq):
+    provenance = [check_source(path, Q8_SHA)]
+    meta, raw, start = gguf_header(path)
+    expected = {
+        'general.architecture': 'qwen3',
+        'general.file_type': 7,
+        'general.quantization_version': 2,
+        'qwen3.block_count': 28,
+        'qwen3.embedding_length': 1024,
+        'qwen3.feed_forward_length': 3072,
+        'qwen3.attention.head_count': 16,
+        'qwen3.attention.head_count_kv': 8,
+        'qwen3.attention.key_length': 128,
+        'qwen3.attention.value_length': 128,
+        'qwen3.rope.freq_base': 1000000.,
+    }
+    for key, value in expected.items():
+        require(meta.get(key) == value, 'unsupported Q8 metadata ' + key)
+    c = Config(
+        1024,
+        3072,
+        28,
+        16,
+        8,
+        128,
+        151936,
+        max_seq,
+        rms_eps=meta['qwen3.attention.layer_norm_rms_epsilon']
+    )
+    tensors = []
+    for name, dims, typ, offset in raw:
+        if name == 'token_embd.weight': role, layer = 1, GLOBAL
+        elif name == 'output_norm.weight': role, layer = 2, GLOBAL
+        else:
+            fields = name.split('.', 2)
+            require(
+                len(fields) == 3 and fields[0] == 'blk' and fields[1].isdigit()
+                and fields[2] in GG_ROLES, 'unexpected Q8 tensor ' + name
+            )
+            role, layer = GG_ROLES[fields[2]], int(fields[1])
+        rows, cols = (1, dims[0]) if len(dims) == 1 else (dims[1], dims[0])
+        norm = role in (2, 10, 15, 16, 17)
+        require(
+            typ == (0 if norm else 8),
+            'Q8 profile expects F32 norms / Q8 matrices'
+        )
+        require(norm or cols % 32 == 0, 'unaligned Q8 columns')
+        size = rows * cols * 4 if norm else rows * (cols // 32) * 34
+        require(
+            start + offset + size <= path.stat().st_size,
+            'Q8 tensor outside file'
+        )
+        tensors.append(
+            Tensor(
+                name, role, layer, F32 if norm else Q8, rows, cols, path,
+                start + offset, size
+            )
+        )
+    validate_tensors(c, tensors)
+    return c, tensors, provenance, 'Qwen/Qwen3-0.6B-GGUF', Q8_REV
+
+
 def bonsai_sources(path, max_seq, yarn):
     provenance = [check_source(path, BONSAI_SHA)]
     meta, raw, start = gguf_header(path)
@@ -421,15 +486,18 @@ def validate_tensors(c, tensors):
         seen.add(key)
         require((t.rows, t.cols) == expected[key],
                 "bad tensor shape: " + t.name)
-        require(t.encoding in (F32, BF16, PQ2), "unsupported encoding")
+        require(t.encoding in (F32, BF16, PQ2, Q8), "unsupported encoding")
         require(
-            t.encoding != PQ2
-            or (t.cols % 128 == 0 and t.role not in (2, 10, 15, 16, 17)),
-            "invalid packed tensor"
+            t.encoding not in (PQ2, Q8) or (
+                t.cols % (128 if t.encoding == PQ2 else 32) == 0
+                and t.role not in (2, 10, 15, 16, 17)
+            ), "invalid packed tensor"
         )
         size = t.rows * t.cols * (
             4 if t.encoding == F32 else 2
-        ) if t.encoding != PQ2 else t.rows * (t.cols // 128) * 34
+        ) if t.encoding not in (
+            PQ2, Q8
+        ) else t.rows * (t.cols // (128 if t.encoding == PQ2 else 32)) * 34
         require(t.bytes == size, "bad tensor size")
         ranges.append(
             (str(t.source), t.source_offset, t.source_offset + t.bytes)
@@ -443,7 +511,14 @@ def validate_tensors(c, tensors):
 
 
 def write_package(
-    out, c, tensors, provenance, model_id, revision, address=DEFAULT_ADDRESS
+    out,
+    c,
+    tensors,
+    provenance,
+    model_id,
+    revision,
+    address=DEFAULT_ADDRESS,
+    memory_profile='ddr'
 ):
     validate_tensors(c, tensors)
     tensors = sorted(tensors, key=lambda t: (t.layer, t.role))
@@ -451,15 +526,19 @@ def write_package(
     for t in tensors:
         t.offset = cursor
         cursor = align(cursor + t.bytes)
+    require(memory_profile in ('ddr', 'hbm'), 'unsupported memory profile')
+    minimum, limit = (DEFAULT_ADDRESS, DDRE) if memory_profile == 'ddr' else (
+        0x81000000, 0x100000000
+    )
     require(
-        DEFAULT_ADDRESS <= address < DDRE and address % 64 == 0,
+        minimum <= address < limit and address % 64 == 0,
         "model address outside reserved DDR map"
     )
     # Reserve full configured token input capacity, logits, and runtime workspace.
     end = align(align(align(address + cursor) + 4 * c.max_seq) +
                 4 * c.vocab) + c.workspace_bytes()
     require(
-        end <= DDRE,
+        end <= limit,
         "model + tokens + logits + workspace exceed 2GiB DDR aperture; reduce --max-seq"
     )
     out.mkdir(parents=True, exist_ok=True)
@@ -470,7 +549,7 @@ def write_package(
         "output package already exists"
     )
     ints = [
-        1, 128, cursor,
+        2 if any(t.encoding == Q8 for t in tensors) else 1, 128, cursor,
         len(tensors), 128, c.dim, c.hidden_dim, c.n_layers, c.n_heads,
         c.n_kv_heads, c.head_dim, c.vocab, c.max_seq, c.flags
     ]
@@ -538,15 +617,20 @@ def write_package(
             "sha256": sha256(final)
         }],
         "arithmetic":
-        "fp32-ordered",
+        "q8_0-ref-activation-i32-block-fp32-ordered"
+        if any(t.encoding == Q8 for t in tensors) else "fp32-ordered",
         "activations":
-        "FP32",
+        "FP32; Q8_0 block32 matvec input"
+        if any(t.encoding == Q8 for t in tensors) else "FP32",
         "kv":
         "FP32",
         "weights":
-        "BF16 unchanged" if all(t.encoding == BF16 for t in tensors) else
-        "native PQ2_0/F32 unchanged",
+        "native Q8_0/F32 unchanged" if any(t.encoding == Q8 for t in tensors)
+        else "BF16 unchanged" if all(t.encoding == BF16 for t in tensors
+                                     ) else "native PQ2_0/F32 unchanged",
         "memory": {
+            "profile": memory_profile,
+            "npu_aperture_end_exclusive": limit,
             "workspace_bytes": c.workspace_bytes(),
             "max_seq": c.max_seq,
             "kv_bytes_per_token": c.kv_bytes_per_token(),
@@ -569,7 +653,10 @@ def write_package(
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("kind", choices=["qwen3-0.6b", "bonsai-1.7b"])
+    p.add_argument(
+        "kind", choices=["qwen3-0.6b", "qwen3-0.6b-q8_0", "bonsai-1.7b"]
+    )
+    p.add_argument('--memory-profile', choices=['ddr', 'hbm'], default='ddr')
     p.add_argument(
         "source",
         type=Path,
@@ -585,13 +672,20 @@ def main():
     p.add_argument("--yarn-attention-factor", type=float)
     a = p.parse_args()
     try:
-        args = qwen_sources(
+        args = qwen_q8_sources(
+            a.source, a.max_seq
+        ) if a.kind == 'qwen3-0.6b-q8_0' else qwen_sources(
             a.source, a.max_seq
         ) if a.kind == "qwen3-0.6b" else bonsai_sources(
             a.source, a.max_seq,
             (a.yarn_beta_fast, a.yarn_beta_slow, a.yarn_attention_factor)
         )
-        result = write_package(a.output, *args, address=a.address)
+        result = write_package(
+            a.output,
+            *args,
+            address=a.address,
+            memory_profile=a.memory_profile
+        )
         print(
             json.dumps({
                 "manifest": str(a.output / "manifest.json"),

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 #include <stddef.h>
 
+#include "address_range.h"
 #include "generate.h"
 #include "mailbox.h"
 volatile cm_mailbox coral_mailbox __attribute__((section(".mailbox"), aligned(64)));
@@ -13,10 +14,9 @@ static int fail(int error) {
   fence();
   return error;
 }
-static int range(uint32_t p, uint32_t n) {
-  return !(p & 3u) && p >= CM_MODEL_MIN && p < CM_DDR_END && n && n <= CM_DDR_END - p;
-}
 int main(void) {
+  /* All FP32 and activation-quantization contracts require RNE. */
+  __asm__ volatile("csrwi fcsr, 0" ::: "memory");
   volatile cm_mailbox *m = &coral_mailbox;
   if (m->magic != CM_MAILBOX_MAGIC || m->abi_version != 2 || m->reserved[0] || m->reserved[1])
     return fail(CM_BAD_REQUEST);
@@ -42,10 +42,10 @@ int main(void) {
   for (unsigned i = 0; i < 6; ++i) {
     if (i >= 4 && !size[i])
       continue;
-    if (!range(addr[i], size[i]))
+    if (!cm_address_range(addr[i], size[i]))
       return fail(CM_BAD_REQUEST);
     for (unsigned j = 0; j < i; ++j)
-      if (size[j] && addr[i] < addr[j] + size[j] && addr[j] < addr[i] + size[i])
+      if (cm_ranges_overlap(addr[i], size[i], addr[j], size[j]))
         return fail(CM_BAD_REQUEST);
   }
   int rc = cm_init(&state, (const void *)(uintptr_t)m->model_addr, m->model_bytes,

@@ -4,9 +4,15 @@
 #include <stdint.h>
 #define CM_MAILBOX_ADDRESS 0x10000u
 #define CM_MAILBOX_MAGIC   0x434d5231u
-#define CM_DDR_BASE        0x20000000u
-#define CM_DDR_END         0xa0000000u
-#define CM_MODEL_MIN       0x21000000u
+#ifdef CM_HBM_PROFILE
+#define CM_DDR_BASE  0x80000000u
+#define CM_DDR_END   UINT64_C(0x100000000)
+#define CM_MODEL_MIN 0x81000000u
+#else
+#define CM_DDR_BASE  0x20000000u
+#define CM_DDR_END   0xa0000000u
+#define CM_MODEL_MIN 0x21000000u
+#endif
 /* Host writes all inputs while reset is asserted, then releases reset.
  * State/completed/error are firmware outputs, observed only after halt or fence.
  * Running status is advisory; the host never modifies a running request. */

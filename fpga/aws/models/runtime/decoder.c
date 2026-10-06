@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "math.h"
+#include "q8_0.h"
 /* Matrix weights and activations are staged through bounded DTCM tiles.
  * Full activations, score vectors and KV remain in DDR. This scalar baseline
  * prioritizes correctness; it is neither an RVV throughput claim nor Q8_K. */
@@ -42,6 +43,8 @@ static int finite(float x) {
 }
 static float clamp(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
 static uint32_t row_bytes(const cm_tensor *t) {
+  if (t->encoding == CM_Q8_0)
+    return (t->cols / 32u) * 34u;
   return t->encoding == CM_PQ2_0 ? (t->cols / 128u) * 34u
                                  : t->cols * (t->encoding == CM_F32 ? 4u : 2u);
 }
@@ -50,6 +53,13 @@ static float element(const unsigned char *p, uint32_t encoding, uint32_t col) {
     return as_float(u32(p + col * 4));
   if (encoding == CM_BF16)
     return as_float(u16(p + col * 2) << 16);
+  if (encoding == CM_Q8_0) {
+    p += (col / 32u) * 34u;
+    int q = p[2 + col % 32u];
+    if (q >= 128)
+      q -= 256;
+    return half(u16(p)) * (float)q;
+  }
   p += (col / 128u) * 34u;
   /* Code 3 has native value +2 and is deliberately preserved. */
   return half(u16(p)) * (float)((int)((p[2 + (col % 128u) / 4u] >> (2 * (col % 4u))) & 3u) - 1);
@@ -58,6 +68,12 @@ float cm_weight(const unsigned char *image, const cm_tensor *t, uint32_t row, ui
   return element(image + t->offset + row * row_bytes(t), t->encoding, col);
 }
 void cm_matvec(float *out, const unsigned char *image, const cm_tensor *t, const float *input) {
+  if (t->encoding == CM_Q8_0) {
+    if (!cm_q8_matvec(out, image + t->offset, t->rows, t->cols, input))
+      for (uint32_t r = 0; r < t->rows; ++r)
+        out[r] = as_float(0x7fc00000u);
+    return;
+  }
   uint32_t stride = row_bytes(t);
   for (uint32_t r = 0; r < t->rows; ++r) {
     const unsigned char *row = image + t->offset + r * stride;
@@ -139,7 +155,7 @@ static int shape(const cm_state *s, uint32_t role, uint32_t layer, uint32_t rows
   if (!t)
     return 0;
   if (norm)
-    return t->encoding != CM_PQ2_0 &&
+    return (t->encoding == CM_F32 || t->encoding == CM_BF16) &&
            ((t->rows == 1 && t->cols == cols) || (t->cols == 1 && t->rows == cols));
   return t->rows == rows && t->cols == cols;
 }
@@ -153,10 +169,12 @@ static int validate_tensors(cm_state *s) {
   uint32_t directory_end = h->dir_offset + h->tensor_count * (uint32_t)sizeof(cm_tensor);
   for (uint32_t i = 0; i < h->tensor_count; ++i) {
     const cm_tensor *t = s->directory + i;
-    if (t->encoding < CM_F32 || t->encoding > CM_PQ2_0 || !t->rows || !t->cols || t->cols > 32768 ||
+    if (t->encoding < CM_F32 || t->encoding > CM_Q8_0 || !t->rows || !t->cols || t->cols > 32768 ||
         t->rows > 200000 || t->reserved || t->offset < directory_end || t->offset % 64 ||
         t->offset > h->file_bytes || t->bytes > h->file_bytes - t->offset ||
-        (t->encoding == CM_PQ2_0 && t->cols % 128))
+        (t->encoding == CM_PQ2_0 && t->cols % 128) ||
+        (t->encoding == CM_Q8_0 && (t->cols % 32 || h->version != CM_VERSION_Q8)) ||
+        (h->version == CM_VERSION_Q8 && t->encoding != CM_F32 && t->encoding != CM_Q8_0))
       return 0;
     uint32_t stride = row_bytes(t);
     if (t->rows > 0xffffffffu / stride || t->bytes != t->rows * stride)
@@ -197,8 +215,9 @@ int cm_init(cm_state *s, const void *image, uint32_t image_bytes, void *workspac
   for (unsigned i = 0; i < 8; ++i)
     if (h->magic[i] != magic[i])
       return CM_BAD_IMAGE;
-  if (h->version != CM_VERSION || h->header_bytes != 128 || h->file_bytes != image_bytes ||
-      h->dir_offset != 128 || h->tensor_count > 1024 || h->tensor_count > (image_bytes - 128) / 32)
+  if ((h->version != CM_VERSION && h->version != CM_VERSION_Q8) || h->header_bytes != 128 ||
+      h->file_bytes != image_bytes || h->dir_offset != 128 || h->tensor_count > 1024 ||
+      h->tensor_count > (image_bytes - 128) / 32)
     return CM_BAD_IMAGE;
   for (unsigned i = 0; i < 9; ++i)
     if (h->reserved[i])
@@ -241,22 +260,22 @@ int cm_init(cm_state *s, const void *image, uint32_t image_bytes, void *workspac
   float logbase = cm_log(h->rope_theta), low = 0, high = 0;
   s->rope_magnitude = 1;
   if (h->flags & CM_YARN) {
-    low = (float)(int)((float)h->head_dim *
-                       cm_log(h->rope_original_context / (h->yarn_beta_fast * 6.28318530718f)) /
-                       (2 * logbase));
-    /* floor/ceil expressed without libc; correction dimensions can be negative. */
+    /* Clamp finite correction dimensions before integer conversion. */
     float raw = (float)h->head_dim *
                 cm_log(h->rope_original_context / (h->yarn_beta_fast * 6.28318530718f)) /
                 (2 * logbase);
-    if (low > raw)
-      low -= 1;
+    if (!finite(raw))
+      return CM_BAD_CONFIG;
+    raw = clamp(raw, 0, (float)h->head_dim - 1);
+    low = (float)(int)raw;
     raw = (float)h->head_dim *
           cm_log(h->rope_original_context / (h->yarn_beta_slow * 6.28318530718f)) / (2 * logbase);
+    if (!finite(raw))
+      return CM_BAD_CONFIG;
+    raw  = clamp(raw, 0, (float)h->head_dim - 1);
     high = (float)(int)raw;
     if (high < raw)
       high += 1;
-    low  = clamp(low, 0, (float)h->head_dim - 1);
-    high = clamp(high, 0, (float)h->head_dim - 1);
     /* yarn_attention_factor is the FINAL multiplier, explicitly resolved by
      * the packager/reference. Do not multiply by a hidden log(factor) default. */
     s->rope_magnitude = h->yarn_attention_factor;
