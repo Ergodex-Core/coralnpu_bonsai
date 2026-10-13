@@ -99,10 +99,10 @@ improve these cycle counts; area/timing and a decoupled feeder remain unmeasured
 | 6 | 123 | 109 | 309 | 181 |
 | 8 | 119 | 109 | 268 | 181 |
 
-These are **Icarus event-driven RTL simulation measurements**, equal for the
+These are **Icarus and independently matched Arcsim RTL simulation measurements**, equal for the
 direct and lookup paths. Decode reads1,216 bytes; M8 reads2,112 bytes. They use
 actual trained weights from one native matrix and seeded synthetic activations.
-They are neither Arcsim nor FPGA measurements, and M8 is a matmul reuse case,
+They are not FPGA measurements, and M8 is a matmul reuse case,
 not measured model prefill. See `results/rtl-simulation.json` for exact values,
 source hashes, capacity utilization and phase costs. Any25MHz time conversion
 there is modeled time only; no inference tokens/s is reported.
@@ -145,7 +145,7 @@ build resources, licensed tool availability, AFI identity and slot windows.
 | Gate | Status |
 | --- | --- |
 | Local exact-value RTL tests and source lint | PASS:72 exact-value cases; Verilator lint |
-| Arcsim compile/model generation and2/4/6/8 runs | NOT_RUN by source owner; handoff required |
+| Arcsim compile/model generation and2/4/6/8 runs | PASS: owner returned72 matched cases at f634998 |
 | Synthesis, resources, routing, timing and CDC for each variant | NOT_RUN |
 | Qualified image and physical kernel correctness | NOT_RUN; requires new image |
 | Actual useful memory bandwidth and DMA overlap | NOT_RUN |
@@ -171,3 +171,15 @@ Q/K/V/output and gate/up/down shapes at M1 and M32, with all integer group dots
 and ordered FP32 scaled-projection references. These are host correctness
 references; measured full-layer Arcsim and physical FPGA results remain pending.
 The existing one-group RTL is unchanged.
+
+## Returned Arcsim evidence
+
+[The owner summary](results/arcsim-summary.json) binds compiler, harness and
+each variant's generated model/state hashes to source f634998. All72 cases
+matched Icarus cycles, traffic, stalls and exact outputs. Build wall times ranged
+from5.00 to29.56 seconds, with sampled peak RSS up to321.38 MiB; these are host
+compiler measurements, not hardware area or throughput. Runtime wall time is
+recorded separately from target cycles and modeled25 MHz latency. Both paths
+have equal target-cycle schedules despite different simulator wall times.
+The returned evidence remains one-group standalone scope. Full projection
+Arcsim latency, scaled-layer hardware and every physical FPGA metric remain pending.
