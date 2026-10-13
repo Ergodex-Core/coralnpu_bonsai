@@ -62,3 +62,7 @@ The draft is isolated from open PR1/2/3/4. It changes documentation and analysis
 only. New RTL, driver, simulator, synthesis, FPGA execution and end-to-end Bonsai
 comparison are explicitly not run. Repository lint/macro outcomes are recorded
 in `results/validation.json`.
+
+See [packing experiments](packing/README.md) for lossless layouts, actual-weight
+host checks, candidate current-image firmware and the physical FPGA acceptance
+plan. Host results and shape-derived byte counts are not FPGA measurements.

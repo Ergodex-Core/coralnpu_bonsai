@@ -199,3 +199,12 @@ residency and HBM-assisted scheduling are different regimes. Its reported
 accelerator scope excludes embedding, position encoding and output layers;
 our workload explicitly includes the large output head. Its throughput and
 power figures cannot be transferred to this image.
+
+## Packing and physical measurement extension
+
+The [lossless packing experiments and FPGA handoff](../../../analysis/ternary_simd/packing/README.md)
+compare native, padded, row-slab and radix-3 representations with every scale,
+header and padding byte counted. Host checks use an actual native matrix.
+Physical fields remain explicitly NOT_RUN; new-client/engine and inference
+metrics require the appropriate qualified image and full runtime. The two-engine
+recommendation remains conditional. Subsequent engine RTL belongs in a separate PR.

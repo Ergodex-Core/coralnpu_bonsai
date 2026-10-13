@@ -21,5 +21,21 @@
     "yapf_0.43.0": "PASS",
     "markdownlint_mdl_0.15.0": "PASS"
   },
-  "git_diff_check": "PASS"
+  "git_diff_check": "PASS",
+  "previous_commit_remote_CI": {
+    "commit": "178968efd91e0c282d8322537f4d9a97711eb618",
+    "CodeQL": "PASS",
+    "RTL_build": "PASS",
+    "Docker": "PASS",
+    "lint": "PASS",
+    "macro_signatures": "PASS",
+    "bazel_exclusive": "IN_PROGRESS_AT_LAST_CHECK",
+    "bazel_parallel": "IN_PROGRESS_AT_LAST_CHECK",
+    "scope": "Does not validate subsequent changes"
+  },
+  "packing": {
+    "native_host_roundtrip_and_C_decode": "PASS",
+    "firmware_RV32_compile": "BLOCKED_TOOLCHAIN_APPLE_CLANG_HAS_NO_RV32_TARGET",
+    "FPGA": "NOT_RUN"
+  }
 }

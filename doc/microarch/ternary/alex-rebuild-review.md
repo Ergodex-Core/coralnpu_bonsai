@@ -72,3 +72,20 @@ After a sizing/numerics decision, integrate via a separate reviewed change,
 retain the existing memory/driver ABI until an explicitly versioned extension,
 run the full acceptance flow, then coordinate the actual-weight simulator and
 FPGA gate with the image owner. No recipe step closes ERG-103 by itself.
+
+## Follow-up sibling inventory
+
+A recursive read-only listing of the authorized package prefix found 1,632
+objects. Neither the root nor sibling prefixes contains the exact referenced
+`verify.py`, root `SHA256SUMS`, `docs/acceptance.md`,
+`evidence/audit/output/acceptance.txt`, or `provenance/README.md`.
+Read-only tar-header inspection found only the routed DCP and AFI manifest
+inside the existing release archive; no package verifier was hidden there.
+
+The accessible `software_and_signoff/` sibling has its own `SHA256SUMS`,
+`timing_cdc_review.md`, `reports/final_audit/acceptance.txt` and `provenance.md`.
+These were fetched and hashed; its README explicitly scopes the checksums to
+that supplemental folder. They support the prior signoff but do not cover the
+new rebuild subtree. The actionable owner request is the complete portable
+package root and its verifier/checksum manifest, plus the referenced adjacent
+review/provenance files or an explicit mapping to the supplied equivalents.
