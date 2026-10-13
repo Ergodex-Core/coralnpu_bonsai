@@ -1,0 +1,408 @@
+INITIAL Q1 CONTEXT ANALYSIS — retained from the first sizing pass.
+The native PQ2 1.7B result and publication scope in doc/microarch/ternary/README.md
+supersede target-selection and unpublished-work statements below. The Q1 calculations
+remain correct for the ERG-103 fixture; native PQ2 needs34bytes/group, not18.
+
+Bonsai SIMD sizing decision — 13 October 2026
+
+Recommendation
+
+Select a 128-lane signed add/subtract/skip dot engine as the analysis candidate,
+with TWO engines at the existing 25 MHz, and a parameterized FOUR-engine option.
+Do not implement eight engines now. Do not claim that two engines deliver a
+measured 2x or 5x whole-model gain: the matched Bonsai INT8 baseline and activation
+contract do not exist in the inspected evidence. On the unchanged core-fed
+memory path, even two engines are unjustified for decode. The two-engine option
+requires a dedicated streaming memory reader, local activation reuse and an
+on-device group-scale/reduction path. If those are out of scope, select at most
+one 64/128-wide diagnostic engine and do not promise significant model speedup.
+
+This is a sizing decision and measurement plan, not authorization to implement
+new RTL. Nothing was built, published, loaded or run on the shared F2 host.
+
+The sensible target is 2x end-to-end first. A 5x goal is conditional on an
+accelerable Bonsai time fraction above 80%, substantially better scheduling than
+the current INT8 software path, and inclusion of conversion/scaling overhead.
+Four engines are an expansion after bandwidth and phase measurements, not a
+default procurement/area assumption. A same-throughput 4x64 alternative is worth
+evaluating if 128-byte activation reads or reduction routing are the constraint.
+
+Evidence and gate status
+
+The analysis owns only this directory. Selected files were exported from Git
+objects and copied from retained receipts; sources/source-index.json binds each
+copy to its original path, revision where applicable, and SHA256. No checkout
+was modified. No relevant .agents/skills existed in either selected repository;
+the broader local skill search found unrelated packages. The local memory summary
+and global AGENTS.md were empty. The local arcilator reference was inspected as
+context; this task did not run an RTL simulator or apply its build workflow.
+
+Bonsai source: 8bbf3a5a (full SHA in index), later than the currently published PR
+head. Read-only live GitHub query found PR #2 OPEN, draft, unmerged, no recorded
+review decision, head fc8ff1b5b2e67c459fe8f61bb192c8d010b1216e. Thus the reviewed /
+merged gate remains open. Do not relabel local fixes as reviewed merged code.
+https://github.com/Ergodex-Core/bonsai_on_chip/pull/2
+
+ERG-103 requires actual-weight DOT128 through sealed memory, driver and mailbox
+in simulator AND custom FPGA, followed by reviewed merged PR. Retained simulator
+evidence includes 396 native commands, 398 reads, 138–157 cycles per job, and
+exact integer/scale results. These exclude host setup/scaling. The report records
+custom FPGA execution as pending; it contains historical status contradictions,
+so the live PR query and separately bound execution receipts govern their own
+claims. No current evidence inspected closes the physical first-slice gate.
+The Qwen generation run is not that gate.
+
+Actual Alex image contract is source 382b5c12030ad8eb74ab8deafb2529301faeab16,
+DCP 2c8f2dbfe98ddf68535eab374d1a1f21095dc3adffdbf86aec444b1961f2d6e5,
+AGFI agfi-075a98d106eb1b6bf, RV32/RVV128/VME, 8 KiB ITCM, 32 KiB DTCM.
+Clocks are core25 / shell250 / HBM AXI300 MHz. Core HBM is 0xc0000000–0xffffffff;
+host BAR4 starts at 0x1000000000. Only 1 GiB is core-addressable. The image has
+one active HBM client behind the interconnect. Physical 16 GiB is not a usable
+16 GiB RV32 allocation. The separate ERG-103 DDR wrapper is not Alex's HBM image.
+Alex's exact HDK/IP pins and implementation choices are retained in provenance.md.
+
+Actual INT8 geometry and observed utilization
+
+Pinned rvv_backend_define.svh: VLEN128 => TE16, COMPRATIO4/TE=1/4, four PE blocks,
+16 physical 256-byte tile registers. Each block has (TE/2*COMPRATIO)*(TE/2)=2*8
+dot cells. zvt_pe_mulbulk_int_lane.sv implements four active diagonal INT8
+products per cell; disabled INT16 cross-products are not extra useful MACs.
+64 cells * 4 = 256 INT8 MAC-equivalents/cycle, or 6.4 GMAC/s at25MHz (12.8 GOP/s
+if multiply and add are counted separately). FP32 ceiling is64 products/cycle.
+Four logical INT32 tiles are accumulator capacity, not four separate engines.
+Tile storage totals4096bytes, implemented in registers/mux logic in this image.
+
+An INT8 instruction describes up to M16,N16,K4 =1024 useful products, stripmined
+over four row cycles. For M1,N16,K4, at most64 products are useful per command.
+The RTL row counter can shorten small-M dispatch; therefore calling decode
+utilization universally 1/16 is wrong. At a one-command/cycle arithmetic ideal,
+M1 reaches64 products/cycle (25% of full peak), but DISPATCH2, four operand uops,
+RAW hazards, loads, issue gaps and drains reduce this. A fixed issue schedule
+can instead exhibit the 1/16 useful-work ratio, as the measured repeated case does.
+
+Actual unchanged-image matrix-01 results, all outputs exact:
+case                            products    setup+issue+drain cycles  GMAC/s
+M1 N16 K4, one command                 64          1686                .000949
+M16 N16 K4, 64 repeated same tile   65,536          2503                .6546
+M1 N16 K4, 64 repeated same tile     4,096          2509                .04081
+M16 N16 K4, 64 repeats, 4 tiles    262,144          7041                .9308
+
+The last case is14.54% of the6.4GMAC/s full peak including setup/drain. Its
+issue-window-only262144/992 exceeds256/cycle: it is NOT a sustained throughput
+measurement, because completion/drain lies outside that timestamp interval.
+These tiny resident-operand cases are neither streaming HBM nor Bonsai layers.
+Use results/measured-matrix.json for exact per-case counts and formulas.
+
+Native workload and numerics
+
+The executable fixture is Bonsai1.7B Q1_0, NOT a native ternary checkpoint:
+128 binary signs plus an FP16 scale =18 bytes, sign bit1=+1,0=-1. The separate
+32-byte ternary2 fixture has00=0,01=+1,10=-1,11=invalid and implicit scale1.
+Do not convert the native checkpoint to this test encoding or invent zero sparsity.
+
+Canonical manifest: 197 Q1 matrices, 113 FP32 vectors;242,357,184-byte image.
+SHA256 ccd70c080f8758e1b4df58c2fdbdd6d13bb65571abbc56feb6942de1f8c07d99 was
+rechecked against the entire local canonical payload in this analysis.
+Exact matrix inventory (N,K,count):
+  1024,2048,56; 2048,2048,56; 6144,2048,56; 2048,6144,28;
+  151669,2048,1 tied embedding/output head.
+K is divisible by128 throughout. Mask the151669-row head tail; never read past
+tensor boundaries. Generic K tails require a new valid-lane contract, or reject
+them under the existing native ABI. Zero-pad ACTIVATIONS only in a defined padded
+test representation, not by reading beyond native packed groups.
+
+One decode step's dense linears, including head once:1,719,904,256 products,
+13,436,752 group dots and241,861,536 packed weight bytes. Embedding is a lookup,
+not a second head matmul. INT8 expansion is1,719,904,256 bytes before scales,
+which does not fit the current1GiB aperture. The fair INT8 baseline must unpack
+bounded tiles from the same Q1 bytes, or account for explicit host streaming.
+Both paths can read packed bytes from HBM; the ternary hardware does NOT get a
+7.11x memory advantage over an INT8 path that already unpacks locally.
+
+Fair operator contract: use the identical Xq int8 tensor on both paths;
+INT8 path expands signs to signed{-1,+1}, accumulates each128-element group into
+int32; candidate performs add/sub at width32/64/128. Widen before negating-128.
+The group dot bound is+/-16384. Keep raw scale bits. Apply scales BEFORE summing
+groups, in a frozen ascending-group FP32 rounding order; unequal scales prevent
+one integer sum across K. Activation scale(s) must also be applied at the agreed
+location and order. Quantizer range, rounding, saturation, granularity and
+nonfinite handling must be frozen from actual model activations before a model
+quality or throughput claim. A seeded int8 dot test is insufficient.
+
+The local harness rechecked394 actual first/last blocks across all197 matrices,
+including signed extremes:1182 exact width-partition comparisons passed. This
+proves host arithmetic equivalence on those blocks, not RTL or model equivalence.
+FP32/BF16 activation inference cannot silently become int8 activation inference.
+The existing Qwen path has Q8 weights with FP32 activations/KV and performs FP32
+matrix work after conversion; it is not a matched INT8-activation Bonsai baseline.
+
+Ternary27B is a separate selection/capacity gate. The retained pinned inventory
+has PTQ1_0 28B/group and PQ2_0 34B/group; official PQ2 decode maps codes to
+-1,0,+1,+2, so code11 cannot inherit the synthetic format's invalid meaning.
+PTQ needs its own interleaved base3 unpacker. Full payload validation and the
+1024-element Hadamard/sign transform contract remain missing. Language containers
+are about5.947GB and7.206GB, already beyond the1GiB aperture, before state. No
+engine count fixes this. Preserve these formats rather than budgeting2bits/weight
+for everything. Source: pinned official runtime ggml-quants.c at
+https://github.com/PrismML-Eng/llama.cpp/blob/adfffbe41b2cabcd51fff326ab045662265062bb/ggml/src/ggml-quants.c
+
+Sizing at25MHz: analytical peaks, NOT achieved timing/throughput
+
+Each W-wide engine consumes W reduction elements per cycle; W128 forms one
+group/cycle only with a pipelined reduction and independent in-flight groups.
+W64/W32 need2/4 issue cycles per group. Pipeline latency is not initiation interval.
+
+             1 engine   2 engines   4 engines   8 engines
+W32 GMAC/s       .8         1.6         3.2         6.4
+W64 GMAC/s      1.6         3.2         6.4        12.8
+W128 GMAC/s     3.2         6.4        12.8        25.6
+
+W128 count                       1          2          4          8
+Q1 feed GB/s                   .45        .90       1.80       3.60
+PTQ1 feed GB/s                 .70       1.40       2.80       5.60
+PQ2 feed GB/s                  .85       1.70       3.40       6.80
+group results / core cycle       1          2          4          8
+dot+FP16 output GB/s            .15        .30        .60       1.20
+compute-only decode sec      .5375      .2687      .1344      .0672
+
+These times exclude activation quantization, scale conversion/multiplication,
+fixed-order reduction, DMA latency, output traffic, attention/KV/norms/activation,
+submission and host boundaries. They are optimistic linear-kernel bounds, not
+tokens/s. Zero weights still occupy packed positions unless a sparse format is
+explicitly introduced; no sparse speedup is assumed.
+
+Bandwidth, overlap and diminishing returns
+
+Existing core external AXI is128bits at25MHz: hard data-width bound0.4GB/s before
+protocol/CDC stalls. HBM AXI300MHz is not the bandwidth seen by this client.
+Existing ERG-103 store has16 logical slots but one physical read outstanding.
+Duplicating clients behind that serial reader cannot supply the table above.
+At read latency L core cycles its64-byte service roof is at most64*25e6/L B/s,
+before issue bubbles. DOT128 rereads a full64B line (two for a crossing): for
+dense aligned18B groups,25% cross a line, averaging80 physical bytes/group if
+no line reuse. That is4.44x more traffic than the ideal18B/group roofline.
+
+The only located device copy diagnostic is262144B in504465cycles:12.991MB/s of
+copied payload (25.98MB/s counting reads+writes). Its zero-padding checksum is
+weak; it is neither a peak-HBM qualification nor a read-only bandwidth ceiling.
+The model sweeps13MB/s,50MB/s,0.2/0.4/0.9/1.6/1.8/3.6GB/s explicitly as
+sensitivity inputs. No measured multi-engine payload bandwidth exists.
+
+Ideal decode linear time max(compute,packed transfer), seconds:
+effective payload GB/s          1x128      2x128      4x128      8x128
+.013                           18.605     18.605     18.605     18.605
+.2                              1.209      1.209      1.209      1.209
+.4                               .605       .605       .605       .605
+.9                               .537       .269       .269       .269
+1.6                              .537       .269       .151       .151
+1.8                              .537       .269       .134       .134
+3.6                              .537       .269       .134       .067
+
+The dedicated adapter could use512bits at25MHz for at most1.6GB/s; that feeds
+two Q1 engines at peak, not four at peak. More bandwidth needs independently
+banked/wider ports or a faster reader plus asynchronous queues, with actual
+interconnect and CDC validation. Do not change the25MHz core assumption.
+For80% arithmetic occupancy, two/four Q1 engines need at least.72/1.44GB/s of
+useful weights, plus activation/output traffic and margin. PTQ/PQ2 need more.
+The saturation count is approximately ceil(B_eff/(f*W*bytes_per_weight)) for
+decode; the last engine may be partly idle. Evaluate incremental latency saved,
+not just whether an extra engine can be kept partly busy.
+
+The max bound assumes independent DMA/compute/scaling stages overlap perfectly.
+Without overlap use their SUM. For each tile, model startup+max(Tread,Tunpack,
+Tdot,Tscale,Twrite)+drain; charge tails and repeated bytes. A descriptor queue
+amortizes control; one host mailbox command per group would require13.4million
+submissions per token and is not a credible execution schedule.
+
+Prefill must be separate
+
+Q1 weight reuse across an8-token tile increases ideal arithmetic intensity from
+7.11 to56.89products/byte for transformer linears. W128 engines can schedule
+independent output rows across tokens without wasting a16-row GEMM dimension.
+Coral's existing INT8 path also becomes substantially better utilized as M grows;
+do not extrapolate its decode underutilization into prefill.
+
+For32-token prefill, last-position-only head:45.408G products. An8-token tile
+schedule reads836.404MB of weights versus241.862MB for an ideal whole-prompt
+single scan (which needs sufficient retained activation/output state).
+At0.4GB/s, ideal linear times for1/2/4/8 W128 engines are14.190/7.095/3.547/2.091s.
+At0.9GB/s:14.190/7.095/3.547/1.774s. These exclude growing attention work and
+activation/output movement. A comparison requiring logits at every prompt
+position must charge the head32times on BOTH paths. The harness uses it once.
+Test M1,2,4,8,16,32,128 and context lengths separately, with identical tokens.
+
+Scratchpad, ports and reduction requirements
+
+Prefer K-parallel W128 over the old draft16x8 systolic mesh for this decision:
+native128-element groups align exactly; decode uses all lanes with no mesh fill
+or folded-mode routing assumption. A seven-level combinational reduction should
+not be assumed to close timing; pipeline it and track row/group/epoch metadata.
+Distribute independent output rows across engines, broadcast one128-byte Xq
+group, and keep each output's group order. Using multiple engines on the SAME
+row needs an additional ordered merge and should not be the initial mapping.
+
+Proposed storage BUDGET (not a synthesized BRAM count) for shared token tile8,
+output tile16, maxK6144: double activation buffers need96KiB; reserve128KiB for
+alignment/banking. Q1 double full-K weight panels need27648B; reserve32KiB.
+Reserve8KiB for result queues, accumulators, descriptors and line assembly:
+about168KiB added storage, physically banked. This exceeds32KiB DTCM, whose
+firmware/stack already consume capacity. It must be accelerator-local memory.
+PTQ/PQ2 need larger weight buffers or smaller tiles; rederive from selected model.
+
+Activation read is128B/cycle shared across engines at the same group/token;
+eight16B banks (or equivalent wide banking) with a separate write bank suffice
+conceptually. E weight banks must collectively deliver18E B/cycle for Q1 plus
+format decoding. Banking groups/panels on ingest is required because row-major
+groups at equal K are strided in HBM; issue contiguous row bursts and transpose
+only the bounded panel. Ping-pong banks avoid read/write conflicts. Replicated
+activation memories or fanout pipeline registers may be needed for routing.
+Scalar DTCM loads cannot provide these ports. Capacity alone proves nothing.
+
+At two engines,50million group results/s require at least two scaled reductions
+per core cycle to retain peak compute. Software FP32 scaling/draining through
+one scalar unit cannot be assumed to keep up. Batch/vectorize independent rows,
+or fuse an explicitly specified scale/reduction pipeline. Keep enough independent
+row accumulators to hide pipeline recurrence latency; retain ascending group
+order and avoid FMA/reassociation unless the numerical contract permits it.
+Returning6bytes/group to HBM/core adds80.62MB per decode step; keeping final
+row accumulators local and writing only final outputs is preferable.
+
+End-to-end target and break-even decision
+
+Let p be the measured fraction of matched baseline time replaced by the entire
+new kernel (including old unpack/scale work), s its speedup, and d added time as
+a fraction of original total. End-to-end speedup=1/(1-p+p/s+d).
+Break-even requires d < p*(1-1/s). If p<=.5, no finite kernel makes2x with d>=0;
+if p<=.8, no finite kernel makes5x. Ignoring new overhead:
+ p             s needed for2x       s needed for5x
+ .60                  6                  impossible
+ .70                  3.5                impossible
+ .80                  2.667              infinite limit only
+ .90                  2.25               9
+ .95                  2.111              6.333
+
+Illustrative decision gates, NOT forecasts: with75% total engine efficiency,
+two128 engines give4.8GMAC/s. For p=.8 and target2x, the matched replaced kernel
+must currently achieve <=1.8GMAC/s, with negligible added overhead. Four engines
+at75% give9.6GMAC/s, lifting that threshold to3.6GMAC/s. For p=.9 and target5x,
+the corresponding thresholds are.533/1.067GMAC/s. Include real bandwidth and
+scale limits before applying these thresholds. The observed small INT8 loops
+cannot substitute for a streaming Bonsai operator measurement.
+
+Against a well-fed full INT8 prefill ceiling6.4GMAC/s, two128 engines have NO
+arithmetic peak advantage; four give2x, eight4x. Even4x kernel gain at p=.9 is
+only3.08x end-to-end. A5x claim must demonstrate removal of current overhead or
+broader fused work, not merely replication. Against a decode bound1.6GMAC/s,
+two engines have4x theoretical arithmetic headroom, still conditional on feeding.
+
+Qwen evidence, explicitly separate: optimized TTFT186.3877s, total560.2247s,
+decode.00534993tokens/s,455808 bitexact logits. Device phases251.766s conversion,
+195.796s matrix,87.023s combine,25.635s other. Making ONLY its matrix phase free
+would cap gain at1.537x. These numbers motivate measuring/fusing conversion and
+reduction; they neither estimate Bonsai's p nor establish its activation precision.
+
+Resource-normalized versus added-resource comparison
+
+Two128 engines have256 simple signed product-equivalent lanes, equal in count
+to Coral's256 INT8 products/cycle. This is an operation-count normalization,
+NOT equal FPGA area/power. Add/sub/skip can avoid weight multipliers but needs
+unpackers, reduction trees, scales, FIFOs, banked SRAM and interconnect. Four and
+eight engines add2x/4x product slots compared with Coral and must be labeled as
+added-resource designs if Coral remains present. Also compare software-only
+unpack/scale improvements and a banked tile-store improvement as competing uses
+of area/engineering effort; no claimed savings before synthesis.
+
+Measured Alex routed CL:786962LUT,206396FF,76RAMB36,11RAMB18,763DSP,0URAM.
+zvtPeArray:81672LUT,29392FF,384DSP. zvtMt:337499LUT,32768FF,0BRAM.
+The4KiB tile store's mux fabric dominates more area than arithmetic. These are
+hierarchical deployed-image reports, not estimates for a new engine or removable
+independent blocks. Full shell reservation and pblock availability matter.
+Reported SLR CLB occupancy is80.42/75.59/84.03%; some cross-SLR links already
+carry10004signals. Reported total WNS+.032ns, TNS0; core-domain WNS+4.709ns.
+The design uses a two-SLR matrix floorplan, tile MUXF remapping and area-oriented
+synthesis. These facts do not establish spare routable area for eight engines or
+allow increasing core frequency. Preserve25MHz, place banks and engines locally,
+pipeline broadcasts/CDC, and inspect post-route timing/congestion at each count.
+No FPGA Fmax, new-engine LUTs/DSPs, watts, or5nm projections are fabricated.
+
+Apex research: inspiration, separate evidence
+
+Homepage KU5P333MHz Gemma3 1B claim:15.63tokens/s,4.5W. Public README reports
+78348LUT/50045register/197DSP/16BRAM/30URAM and1.05MB SRAM, with streaming
+quantized matvec and fused activation/attention support. These are vendor-reported
+resources/results for its own design;95.6% is a1024-square BF16 kernel metric,
+not whole-model MFU or a resource predictor for our engine.
+https://apexcompute.com/
+https://github.com/apex-compute/unified-engine
+
+Historical Gemma performance.md at635191a8: Kintex7,198.3MHz,IF4~507.8MB,
+19-token prefill, compiler paths reporting1.12/1.13s and10.29/10.32tokens/s.
+Keep this distinct from KU5P333MHz. Current repository HEAD d0137dbb instead
+has gemma3_performance.md on Alveo366.7MHz, reporting one/eight-core decode
+18.03/72.80tokens/s and unsharded prefill~.64s. This newer report is not the
+older Kintex7 experiment. Pinned copies and hashes are under sources/apex.
+https://github.com/apex-compute/unified-engine/blob/635191a8b5bbc6965300d10e28f36434fa3ddf2a/models/gemma3/performance.md
+https://github.com/apex-compute/unified-engine/blob/d0137dbbdfc5b91186bf80f79628af97c0d7147f/models/gemma3/gemma3_performance.md
+
+Transfer the design lessons: stream compressed weights, retain activations and
+accumulators locally, fuse postprocessing with explicit numeric semantics,
+trace DMA/compute/wait phases, and partition real work evenly. The unsharded
+prefill example is a useful reminder that adding cores does not automatically
+parallelize a phase. Do not import its quantization, clock, watts or headline
+throughput into a Bonsai/F2 forecast. No Apex code or FPGA build was run here.
+
+Exact missing measurements — request THROUGH parent/FPGA owner only
+
+1. Freeze the target checkpoint: executable Q1_0 first-slice versus actual native
+   ternary27B. For27B obtain full payload verification, transform/activation
+   contract and a larger-address-space plan before engine implementation.
+2. On identical native Q1 tensors and actual saved activation tensors, run the
+   existing Coral signed INT8 path: M1/2/4/8/16/32, N1024/2048/6144/head tail,
+   K2048/6144; include compact tail tests. Use per-group scale and same quantizer,
+   rounding and outputs. Separate quantize, unpack/transpose, load, completed
+   MAC, scale/reduce, store, submission and other operator cycles. Repeat/warm up
+   after correctness, report dispersion and source/ELF/AGFI hashes.
+3. Measure HBM READ useful bandwidth for64B/256B/4KiB/large bursts, alignment,
+   one/multiple outstanding requests, contiguous rows versus panel striding,
+   and simultaneous read/write. Verify nontrivial checksum; record actual bytes,
+   cycles, stall causes and arbitration. Host upload/readback rate is separate.
+   Existing firmware can qualify its core path; proposed DMA adapter requires
+   later simulation/implementation and must not borrow that rate uncritically.
+4. Measure scale/reduction group-results/cycle, quantization elements/cycle,
+   and local bank sustainable ports. Profile native full-layer and whole-step
+   non-matmul fraction p for decode and prompt lengths8/32/128 separately; include
+   attention/KV, norms, activation, embedding and host delivery.
+5. From Alex's recipe, get exact source/config/IP/floorplan and available pblock
+   budget; only AFTER sizing acceptance evaluate isolated1/2/4 engine synthesis
+   and routed timing/area. No full build is requested by this analysis. A measured
+   new-engine memory/scale path and routed resource deltas are needed for final
+   resource-normalized selection. Power needs a separate measured protocol.
+
+Practical integration sequence after decision
+
+Preserve DOT128 v1 as the diagnostic contract. First close ERG-103's own simulator,
+actual-weight sealed FPGA, driver/mailbox and review/merge gates. Alex image reuse
+requires a separately reviewed mapping, not renaming the Qwen pass.
+Then version a tile/descriptor ABI and memory client, preserving tags, epochs,
+backpressure, sealing, fault/drain/reset semantics. Add streaming burst reads,
+line reuse and scratchpad ownership; seal ALL paths that could write weights,
+including core/DMA/host. Keep activation/KV regions writable and disjoint.
+Expose full-operator completion plus byte/stall/compute/scale counters. Verify
+CPU reference -> simulator -> bounded physical native operator -> layer -> model,
+with identical numerical contracts. Expand two to four only when measured p,
+bandwidth and scaling meet the target equations and routing fits. Leave eight
+out until a new measured bottleneck analysis supports it. Parent coordinates any
+future host window and Alex image process; this deliverable performs no such work.
+
+Reproduction
+
+  python3 sizing.py
+    Recreates analytical JSON and synthetic arithmetic checks using stdlib only.
+  python3 sizing.py --weights /absolute/path/to/canonical/weights.bin
+    Rechecks canonical242MB SHA and394 actual native groups (1182 width checks).
+
+All output is in results/. Width/count/bandwidth and end-to-end sensitivity are
+explicit in sizing.py. Candidate rooflines omit non-matmul overhead by design;
+read them with this report. They are bounds, not a device performance prediction.
+Remaining blocker to an unconditional engine-count/speedup commitment is missing
+matched Bonsai numerical and phase/bandwidth evidence, not more speculative RTL.

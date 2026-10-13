@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "actual_native_blocks": 394,
+  "partitioned_dot_checks": 1182,
+  "widths": [
+    32,
+    64,
+    128
+  ],
+  "seed": 103,
+  "weights_sha256": "ccd70c080f8758e1b4df58c2fdbdd6d13bb65571abbc56feb6942de1f8c07d99",
+  "scaled_results_sha256": "c1e5325f92ab94244b180be2593350adf46e4fc8a63cd399e7b3528ebf4daebd",
+  "scope": "Host algebra check on native Q1 bytes; no RTL/FPGA/model activation quantizer validation"
+}

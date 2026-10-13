@@ -1,0 +1,32 @@
+{
+  "candidate": {
+    "device_seconds": 560.2201546,
+    "other_seconds": 25.63504612
+  },
+  "phases": [
+    {
+      "phase": "conversion_cycles",
+      "baseline_cycles": 9720071409,
+      "candidate_cycles": 6294140802,
+      "baseline_seconds": 388.80285636,
+      "candidate_seconds": 251.76563208,
+      "reduction_percent": 35.24594072249167
+    },
+    {
+      "phase": "matrix_cycles",
+      "baseline_cycles": 4897936293,
+      "candidate_cycles": 4894911102,
+      "baseline_seconds": 195.91745172,
+      "candidate_seconds": 195.79644408,
+      "reduction_percent": 0.061764604907654785
+    },
+    {
+      "phase": "combine_cycles",
+      "baseline_cycles": 2175575808,
+      "candidate_cycles": 2175575808,
+      "baseline_seconds": 87.02303232,
+      "candidate_seconds": 87.02303232,
+      "reduction_percent": 0.0
+    }
+  ]
+}

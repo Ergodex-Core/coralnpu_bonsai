@@ -1,0 +1,11 @@
+{
+  "scope": "Qwen W8/FP32 only, never a Bonsai speedup forecast",
+  "matrix_only_zero_time_ceiling": 1.5372769071491426,
+  "conversion_matrix_combine_zero_time_ceiling": 21.853682336967843,
+  "phases": {
+    "conversion_cycles": 251.76563208,
+    "matrix_cycles": 195.79644408,
+    "combine_cycles": 87.02303232
+  },
+  "total_seconds": 560.2201546
+}
