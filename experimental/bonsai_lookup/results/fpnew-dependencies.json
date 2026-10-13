@@ -1,0 +1,12 @@
+{
+  "source": "Alex frozen rebuild/input/core/rtl; externally supplied, not vendored",
+  "files": {
+    "registers.svh": "ba879fa95e10ff63c5af5d8d8857994ac56b84d7c29cc8fc28779ad11504eabb",
+    "cf_math_pkg.sv": "a3a75f0cf55c4c5f5a6c6cdd4ae03863e73e8becf4b4804c9c09ce2aeb165c0f",
+    "lzc.sv": "1ed8d7a6ed2137ff4749ef2c8c3731c3aad372e10031d055e1b522ae6528f943",
+    "fpnew_pkg.sv": "30b753fab5c3edb90d194b228e22a47421191943a669274d2dc8c1128a154e27",
+    "fpnew_classifier.sv": "a20b49366806350e60d5c7a15805b69331c2aa9eb44f3702a62d386087510f8e",
+    "fpnew_rounding.sv": "de8a47c8e00d82e9aa2e7949d220090859b64fdcb36945b595ec0686a47185bf",
+    "fpnew_fma.sv": "fbf6575e67d5fa8905970a3158e5d09c4f2e8140b81905e0bcace675d7507332"
+  }
+}

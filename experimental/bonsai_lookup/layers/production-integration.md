@@ -8,8 +8,10 @@ HBM-AXI300 MHz through the launcher's explicit settings.
 
 ## 1. Close the numerical and complete-layer boundary
 
-Use the seven full projection fixtures and ordered FP32 reference in this
-folder. Add a layer sequencer carrying token,row,K-group,job and epoch identity.
+The [scaled RTL candidate](scaled-rtl.md) now adds a full-K tile sequencer,
+ordered FP32 operations and explicit scale reads against the seven projection
+fixtures. It preserves token,row,K-group and job identity. Production epoch
+identity, memory arbitration, result stores and recovery remain to be added.
 Retain per-output FP32 accumulators across K groups; with M8,N32 the accumulator
 payload alone is1,024 bytes. Apply each native scale and activation scale in the
 specified order. Pipeline independent output rows while preserving accumulation
@@ -17,9 +19,9 @@ order for each row. Measure the scale/reduction initiation rate and stalls;
 it must not be assumed to match the E integer dots/cycle sizing roofline.
 
 A software scale/reduction path can establish first functional integration,
-but its measured cycles must remain in the operator latency. A future FPGA
-FP32 pipeline is a separately reviewed resource/timing decision. Include stores
-and error completion in the full projection contract. A descriptor extension
+but its measured cycles must remain in the operator latency. The new dedicated
+shared FP32 unit remains a separately reviewed FPGA resource/timing decision.
+Include stores and error completion in the full projection contract. A descriptor extension
 must be versioned separately from DOT128 v1. The actual-weight mailbox/driver,
 simulator/FPGA and reviewed-merge requirements of ERG-103 remain independent.
 

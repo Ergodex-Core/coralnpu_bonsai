@@ -8,11 +8,12 @@ a balanced reduction. The same bounded feeder, operands and memory service are
 used for both. The independent scalar oracle checks every result and scale bit.
 
 The intended result is `M x N` integer group dots for one stored K=128 group,
-with up to eight tokens and 32 output rows. Larger K requires ordered group
-scaling/reduction in a later integration. **No FP32 scale multiplication,
-activation quantization, attention, output HBM stores, full-model runtime,
-production AXI/DMA adapter, banked SRAM implementation, or ping-pong overlap is
-claimed.** Existing DOT128 ABI and Coral RTL are untouched.
+with up to eight tokens and 32 output rows. The separate
+[scaled top](layers/scaled-rtl.md) now composes groups across the full K dimension
+with ordered FP32 multiplication/reduction and activation-scale reads. Activation
+quantization, attention, output HBM stores, full-model runtime, production AXI/DMA,
+banked SRAM and ping-pong overlap remain pending. Existing DOT128 ABI and Coral
+RTL are untouched.
 
 ## Arithmetic and layout
 
@@ -27,8 +28,8 @@ has no code11; admission must remain bound to that verified checkpoint until
 A triple partial is signed10 bits, covering -384..384. Balanced tree nodes are
 signed16 bits, sufficient for the exact group bound -16384..16384. Outputs are
 sign-extended int32, with no saturation or wrap at this bound. The scale's exact
-FP16 bits accompany each dot without conversion. Per-group FP32 scaling and
-ordered accumulation remain a separate shared oracle/implementation requirement;
+FP16 bits accompany each dot without conversion. The composed top implements
+per-group FP32 scaling and ordered accumulation against the shared oracle;
 integer kernel equality does not establish equivalence to FP32 model activations.
 
 The lookup path registers 43 tables of 27 triple sums when an activation row is
@@ -158,7 +159,7 @@ hashes, DCP/AFI identity and observed slot, clocks, exact outputs, bytes and cyc
 boundaries. Failed variants remain failed/pending instead of disappearing.
 
 First validate physical group/operator correctness and real memory bandwidth.
-Then integrate the same quantization and ordered scale/reduction as the existing
+Validate the same quantization and ordered scale/reduction against the existing
 INT8 baseline. Only a complete model path can supply inference numbers: matched
 prompt/context/batch, prefill token count and timing, TTFT including agreed setup,
 steady decode TPS, and complete request latency. Report reset/loading separately
@@ -168,9 +169,10 @@ and disclose concurrency. Standalone dot tiles cannot substantiate model TPS.
 
 [Layer fixture preparation](layers/README.md) now covers complete native block0
 Q/K/V/output and gate/up/down shapes at M1 and M32, with all integer group dots
-and ordered FP32 scaled-projection references. These are host correctness
-references; measured full-layer Arcsim and physical FPGA results remain pending.
-The existing one-group RTL is unchanged.
+and ordered FP32 scaled-projection references. The new
+[scaled RTL candidate](layers/scaled-rtl.md) consumes these references in a composed
+Verilator simulation; measured full-layer Arcsim and physical FPGA
+results remain pending. The existing one-group RTL is unchanged.
 
 ## Returned Arcsim evidence
 
@@ -182,4 +184,15 @@ compiler measurements, not hardware area or throughput. Runtime wall time is
 recorded separately from target cycles and modeled25 MHz latency. Both paths
 have equal target-cycle schedules despite different simulator wall times.
 The returned evidence remains one-group standalone scope. Full projection
-Arcsim latency, scaled-layer hardware and every physical FPGA metric remain pending.
+Arcsim latency and every physical FPGA metric remain pending. The new composed
+scaled top has its own validation report and must be compiled/run independently.
+
+## Composed scaled-projection validation
+
+The new [full-K scaled top](layers/scaled-rtl.md) passes28 complete-projection
+Verilator runs,1,148,928 checked FP32 outputs, nine protocol cases and144,291
+reducer stress updates. The primary two-engine lookup path covers all seven
+projection shapes at M1 and M32; every direct/lookup2/4/6/8 variant covers complete
+Q at both shapes. All variants have identical Q target-cycle counts because the
+shared serial FP32 reducer limits this initial schedule. This is a functional
+integration baseline, not a demonstrated end-to-end speedup or FPGA result.

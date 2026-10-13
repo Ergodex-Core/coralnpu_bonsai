@@ -91,9 +91,9 @@ not measured useful bandwidth or a production-optimal schedule.
 Arcsim owner progression: one terminal tile per projection, then one complete
 decode projection, then remaining full projections within the agreed resource
 budget. Use identical memory service and fixtures for2/4/6/8 engines. Record
-integer-group sweep latency separately from scaled projection latency. The latter
-is currently **NOT_IMPLEMENTED_IN_RTL**; a host postprocessing reference cannot
-supply its simulated hardware cycles. No host/slot operation is dispatched here.
+integer-group sweep latency separately from scaled projection latency. The [new composed scaled top](scaled-rtl.md) implements the latter in standalone
+RTL and has a separate Verilator suite. It requires a new Arcsim compile/run;
+the old one-group model and host postprocessing cannot supply its hardware cycles. No host/slot operation is dispatched here.
 
 ## FPGA progression and integration prerequisites
 

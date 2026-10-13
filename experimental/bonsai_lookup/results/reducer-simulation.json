@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "checked_updates": 144291,
+  "target_cycles": 2983319,
+  "scope": "Standalone reducer Verilator simulation; scalar host FP32 oracle; no FPGA metrics",
+  "source_sha256": {
+    "rtl/bonsai_group_reduce.sv": "c4447976cac3391c56ba29867a6497b639be892c68e8daddc65b855b3cdbf88f",
+    "tests/scaled/reducer_tb.cc": "b467fd228360d4c4a5d7f193deef4533024122aa34cc466d8f8e3a6b2f204659"
+  },
+  "cases": [
+    "all 32769 bounded integer dots",
+    "all 63488 finite FP16 bit patterns",
+    "1000 ordered 48-group random FP32-scale frames",
+    "7 malformed/error inputs",
+    "sticky OF/NX and UF/NX flags",
+    "ties-to-even",
+    "invalid G=0/49",
+    "reset at 22 operation phases"
+  ]
+}
