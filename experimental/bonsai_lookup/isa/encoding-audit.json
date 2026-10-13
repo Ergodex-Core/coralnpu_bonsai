@@ -1,0 +1,43 @@
+{
+  "status": "PASS",
+  "scope": "Source mask audit and real assembler bytes only; no hardware execution",
+  "core_source_commit": "b6e9dd7eb5c1765dabede62a07145d489ef39f9b",
+  "core_source_sha256": {
+    "hdl/chisel/src/coralnpu/scalar/Decode.scala": "3ffddf1bc4091b465766f57737a740dc42010ba65c2a7cfc8dd14bf131d2edb2",
+    "hdl/chisel/src/coralnpu/float/FloatCoreInterface.scala": "cb80c6e66cbcd44ab8a49b3516daf0526df8e51935c4e769905135d30fe6fa13",
+    "hdl/chisel/src/coralnpu/rvv/RvvDecode.scala": "aba106df8e0e38a6ae656177b9f6f84f01f60848648f17a7b3671bc3f77e8f31",
+    "tests/cocotb/vme_test/vme_test_utils.h": "05ce0c1d7b82c67a8dda163c1ae3c1e3f7eef5ccbbd170c8c8cf85e8a93f59d5"
+  },
+  "scalar_bitpats": 102,
+  "float_bitpats": 26,
+  "rvv_major_opcodes": [
+    "0x7",
+    "0x27",
+    "0x57",
+    "0x77"
+  ],
+  "fp_major_bits_6_2": [
+    1,
+    9,
+    20,
+    16,
+    17,
+    18,
+    19
+  ],
+  "valid_register_combinations_assembled": 2976,
+  "reserved_and_major_field_checks": 413792,
+  "assembler_command": [
+    "/usr/local/opt/llvm/bin/clang",
+    "--target=riscv32-unknown-elf",
+    "-march=rv32im",
+    "-mabi=ilp32",
+    "-c",
+    "/tmp/bonsai-isa-check/all-registers.s",
+    "-o",
+    "/tmp/bonsai-isa-check/all-registers.o"
+  ],
+  "assembler_version": "Homebrew clang version 23.1.0\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /usr/local/Cellar/llvm/23.1.0/bin\nConfiguration file: /usr/local/Cellar/llvm/23.1.0/etc/clang/x86_64-apple-darwin24.cfg\n",
+  "text_sha256": "e20fab04afb0e647d683822f4bf73a3d0f3b0afb469017f8dd09b971f6bc1d53",
+  "checker_sha256": "391984053bfa9a2f21b86f013b7c921e9c0c048d7aba0448fb7fe50651546efd"
+}
