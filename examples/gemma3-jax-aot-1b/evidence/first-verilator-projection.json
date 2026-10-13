@@ -1,0 +1,97 @@
+{
+  "status": "PASS_ALL_THREE_BOUNDED_TARGET_TESTS",
+  "shape": {
+    "M": 1,
+    "N": 256,
+    "K": 1152,
+    "MACs": 294912
+  },
+  "scope": "Layer 0 K projection, actual BOS[2] prefill activation; prepacked operands",
+  "sources": {
+    "head": "3d5a1421",
+    "original_kernel_sha256": "a4edcac0d2792af5458b51f77d4139ae28ff286970439f52080b14a127a68653",
+    "google_checkpoint_revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+    "google_weight_sha256": "3d4ef8d71c14db7e448a09ebe891cfb6bf32c57a9b44499ae0d1c098e48516b6",
+    "redhat_checkpoint_revision": "edcc2e0074dd20c50c3e0a680a581c4ccc0c1392",
+    "redhat_weight_sha256": "8cc0227db20ae63a50c9c1edd6dda3fa0b92a4efca9ad9ca7dbb396b35cae5c1",
+    "note": "Different checkpoints; no conversion of Google BF16 to RedHat GPTQ implied."
+  },
+  "archive_sha256": "8a7420dde63ea2b6221bf03dd95f51543f01ba1d35ca9ad6807a41dcd7a4b3b7",
+  "simulator_sha256": "95d987b081412a0da16798b7820ace16fffc3abd5b597e3d2a3d04662636a7a5",
+  "RTL_revision": "0735a5ddf756e87a929de534079b351e08e65866",
+  "memory_latency_cycles": 2,
+  "runs": [
+    {
+      "mode": "google_bf16",
+      "status": "PASS",
+      "harness_cycles": 447644,
+      "phase_cycles": 447556,
+      "matrix_cycles": 443189,
+      "postprocess_cycles": 4367,
+      "harness_ms_at_25MHz": 17.90576,
+      "phase_ms_at_25MHz": 17.90224,
+      "AXI_read_beats": 73984,
+      "AXI_write_beats": 320,
+      "wall_seconds": 15.883663346990943,
+      "peak_RSS_MiB": 13.78515625,
+      "detail": {
+        "max_absolute_error": 2.077571116387844e-05,
+        "max_error_over_bound": 0.0034330311332020002,
+        "sequential_fp32_bitwise_match": false,
+        "pairwise_fp32_bitwise_match": false,
+        "numerical_contract": "all256 analytic FP32 forward-error bounds, not BF16 output bit equivalence"
+      }
+    },
+    {
+      "mode": "regression_minus128",
+      "status": "PASS",
+      "harness_cycles": 282549,
+      "phase_cycles": 282458,
+      "matrix_cycles": 270410,
+      "postprocess_cycles": 12048,
+      "harness_ms_at_25MHz": 11.30196,
+      "phase_ms_at_25MHz": 11.29832,
+      "AXI_read_beats": 38784,
+      "AXI_write_beats": 576,
+      "wall_seconds": 10.301118655013852,
+      "peak_RSS_MiB": 13.21484375,
+      "detail": {
+        "numerical_contract": "all256 INT32 and all256 scaled FP32 bit-exact"
+      }
+    },
+    {
+      "mode": "redhat_w8a8",
+      "status": "PASS",
+      "harness_cycles": 282549,
+      "phase_cycles": 282458,
+      "matrix_cycles": 270410,
+      "postprocess_cycles": 12048,
+      "harness_ms_at_25MHz": 11.30196,
+      "phase_ms_at_25MHz": 11.29832,
+      "AXI_read_beats": 38784,
+      "AXI_write_beats": 576,
+      "wall_seconds": 10.387081568944268,
+      "peak_RSS_MiB": 13.28125,
+      "detail": {
+        "numerical_contract": "all256 INT32 and all256 scaled FP32 bit-exact"
+      }
+    }
+  ],
+  "full_model_TPS": null,
+  "complete_projection_contract": false,
+  "excludes": [
+    "host preload",
+    "packing",
+    "activation quantization",
+    "tokenizer/reference preparation"
+  ],
+  "limitations": [
+    "Google BF16 passes all256 analytic FP32 error bounds; sequential and pairwise FP32 references do not match bitwise",
+    "Different Google and RedHatAI checkpoints; no conversion equivalence claimed",
+    "AXI counters report beats, max16B per beat; exact byte counts not recorded",
+    "Memory model is not calibrated HBM",
+    "Not cached decode, full layer, whole model or FPGA timing",
+    "Official AOT compiler route remains unqualified; tests use custom matrix firmware"
+  ],
+  "provenance": "Sanitized simulator-owner execution receipt; distinct custom matrix firmware, not official AOT output."
+}

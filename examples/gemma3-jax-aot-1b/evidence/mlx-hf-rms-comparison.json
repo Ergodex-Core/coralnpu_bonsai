@@ -1,0 +1,86 @@
+{
+  "mapping": "PASS all182 projection matrices inverse-bit-exact and full parameter tree shapes/dtypes",
+  "architecture": "PASS26 layers,22local/4global",
+  "tokenizer": "PASS exact10-token prompt",
+  "rows": [
+    {
+      "kind": "k_projection",
+      "layer": 0,
+      "M": 1,
+      "outputs": 256,
+      "analytic_bound": "PASS",
+      "MLX_bitwise_equal": true,
+      "MLX_max_absolute_error": 0.0
+    },
+    {
+      "kind": "block",
+      "layer": 0,
+      "M": 1,
+      "outputs": 1152,
+      "MLX_bitwise_equal": false,
+      "MLX_max_absolute_error": 0.125,
+      "MLX_relative_L2": 0.00012437906116247177,
+      "status": "NUMERICAL_DIFFERENCE_REQUIRES_REVIEW"
+    },
+    {
+      "kind": "k_projection",
+      "layer": 5,
+      "M": 1,
+      "outputs": 256,
+      "analytic_bound": "PASS",
+      "MLX_bitwise_equal": true,
+      "MLX_max_absolute_error": 0.0
+    },
+    {
+      "kind": "block",
+      "layer": 5,
+      "M": 1,
+      "outputs": 1152,
+      "MLX_bitwise_equal": false,
+      "MLX_max_absolute_error": 0.25,
+      "MLX_relative_L2": 5.9119094657944515e-05,
+      "status": "NUMERICAL_DIFFERENCE_REQUIRES_REVIEW"
+    },
+    {
+      "kind": "k_projection",
+      "layer": 0,
+      "M": 10,
+      "outputs": 2560,
+      "analytic_bound": "PASS",
+      "MLX_bitwise_equal": true,
+      "MLX_max_absolute_error": 0.0
+    },
+    {
+      "kind": "block",
+      "layer": 0,
+      "M": 10,
+      "outputs": 11520,
+      "MLX_bitwise_equal": false,
+      "MLX_max_absolute_error": 1.0,
+      "MLX_relative_L2": 0.002070037415251136,
+      "status": "NUMERICAL_DIFFERENCE_REQUIRES_REVIEW"
+    },
+    {
+      "kind": "k_projection",
+      "layer": 5,
+      "M": 10,
+      "outputs": 2560,
+      "analytic_bound": "PASS",
+      "MLX_bitwise_equal": false,
+      "MLX_max_absolute_error": 9.5367431640625e-07
+    },
+    {
+      "kind": "block",
+      "layer": 5,
+      "M": 10,
+      "outputs": 11520,
+      "MLX_bitwise_equal": false,
+      "MLX_max_absolute_error": 8.0,
+      "MLX_relative_L2": 0.0006104842177592218,
+      "status": "NUMERICAL_DIFFERENCE_REQUIRES_REVIEW"
+    }
+  ],
+  "target_execution": "NOT_RUN",
+  "end_to_end_model_equivalence": "NOT_ESTABLISHED",
+  "reference_contract": "MLX0.32.0/mlx-lm0.31.3 with HF FP32 RMS arithmetic"
+}

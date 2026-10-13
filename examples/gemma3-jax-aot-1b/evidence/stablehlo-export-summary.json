@@ -1,0 +1,70 @@
+{
+  "model": "google/gemma-3-1b-it",
+  "revision": "dcc83ea841ab6100d6b47a070329e1ba4cf78752",
+  "checkpoint_sha256": "3d4ef8d71c14db7e448a09ebe891cfb6bf32c57a9b44499ae0d1c098e48516b6",
+  "precision": "Original BF16; HF FP32 RMS math; original official Gemma attention/MLP and real RoPE patch",
+  "cache_length": 128,
+  "layers": 26,
+  "local_layers": 22,
+  "global_layers": [
+    5,
+    11,
+    17,
+    23
+  ],
+  "cache_policy": "left-aligned full-sized caches; local512 mask; host rejects overflow",
+  "cache_payload_bytes": 3407872,
+  "jax": "0.11.1",
+  "target_compiler_status": "NOT_RUN",
+  "target_execution_status": "NOT_RUN",
+  "W8A8": "UNSUPPORTED, never relabeled",
+  "exports": [
+    {
+      "name": "gemma3_1b_layer0_k_projection",
+      "file": "gemma3_1b_layer0_k_projection.mlir",
+      "bytes": 785,
+      "sha256": "33853e423bae1a66fda4ac68785242de3732e472a2309033b32b8705e6552679",
+      "status": "STABLEHLO_ONLY_NOT_CORAL_EXECUTABLE",
+      "argument_leaf_count": 2,
+      "output_leaf_count": 1
+    },
+    {
+      "name": "gemma3_1b_logits",
+      "file": "gemma3_1b_logits.mlir",
+      "bytes": 702844,
+      "sha256": "e03e2dcec62cc1eb698f4589b04d6b5a294447f19b891a9bb4b0461199c689f5",
+      "status": "STABLEHLO_ONLY_NOT_CORAL_EXECUTABLE",
+      "argument_leaf_count": 395,
+      "output_leaf_count": 105
+    },
+    {
+      "name": "gemma3_1b_part1",
+      "file": "gemma3_1b_part1.mlir",
+      "bytes": 350204,
+      "sha256": "a4b5d1e594d8dd3fae8f872ba3a32616c4895467b891673f752fb8490ab43a04",
+      "status": "STABLEHLO_ONLY_NOT_CORAL_EXECUTABLE",
+      "argument_leaf_count": 199,
+      "output_leaf_count": 53
+    },
+    {
+      "name": "gemma3_1b_part2",
+      "file": "gemma3_1b_part2.mlir",
+      "bytes": 350592,
+      "sha256": "ae4ec0dfb34b1c1a930ad06731aa6574c0fcea7453652ab32a8825a4a1ca0270",
+      "status": "STABLEHLO_ONLY_NOT_CORAL_EXECUTABLE",
+      "argument_leaf_count": 199,
+      "output_leaf_count": 53
+    },
+    {
+      "name": "gemma3_1b_head",
+      "file": "gemma3_1b_head.mlir",
+      "bytes": 577,
+      "sha256": "27e6a48d064cabd862a42f978e010ece2f56e647d5d85d411a304c6c0966ff87",
+      "status": "STABLEHLO_ONLY_NOT_CORAL_EXECUTABLE",
+      "argument_leaf_count": 2,
+      "output_leaf_count": 1
+    }
+  ],
+  "unit_tests": "PASS5 semantic tests",
+  "source_context": "No model or reference tensor bytes included. Target NOT_RUN refers to official AOT, separately recorded custom-firmware diagnostic did run."
+}
