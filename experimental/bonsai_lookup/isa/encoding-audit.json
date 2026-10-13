@@ -25,19 +25,26 @@
     18,
     19
   ],
-  "valid_register_combinations_assembled": 2976,
-  "reserved_and_major_field_checks": 413792,
+  "valid_register_combinations_assembled": 68512,
+  "combinations_by_instruction": {
+    "bt.submit": 992,
+    "bt.poll": 992,
+    "bt.reap": 992,
+    "bt.lpq": 32768,
+    "bt.spq": 32768
+  },
+  "reserved_and_major_field_checks": 8802464,
   "assembler_command": [
     "/usr/local/opt/llvm/bin/clang",
     "--target=riscv32-unknown-elf",
     "-march=rv32im",
     "-mabi=ilp32",
     "-c",
-    "/tmp/bonsai-isa-check/all-registers.s",
+    "/tmp/bonsai-isa-check-v02/all-registers.s",
     "-o",
-    "/tmp/bonsai-isa-check/all-registers.o"
+    "/tmp/bonsai-isa-check-v02/all-registers.o"
   ],
   "assembler_version": "Homebrew clang version 23.1.0\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /usr/local/Cellar/llvm/23.1.0/bin\nConfiguration file: /usr/local/Cellar/llvm/23.1.0/etc/clang/x86_64-apple-darwin24.cfg\n",
-  "text_sha256": "e20fab04afb0e647d683822f4bf73a3d0f3b0afb469017f8dd09b971f6bc1d53",
-  "checker_sha256": "391984053bfa9a2f21b86f013b7c921e9c0c048d7aba0448fb7fe50651546efd"
+  "text_sha256": "5e53e6b81c3c6dadae83355c9d604504c5e4fbe48598b4d29b2b9c5f4c61c6a9",
+  "checker_sha256": "20c5f97656f44845a3bc9ea847cac9e4e1ba5af6641fcd8965db4bdfa43a3aa4"
 }

@@ -10,8 +10,14 @@ import struct
 import subprocess
 
 PIN = 'b6e9dd7eb5c1765dabede62a07145d489ef39f9b'
-MASK = 0xfff0707f
-OPS = {'bt.submit': 0, 'bt.poll': 1, 'bt.reap': 2}
+OPS = {
+    # name: (funct7, funct3, mask, first register index, rs2 register choices)
+    'bt.submit': (0x40, 0, 0xfff0707f, 1, range(1)),
+    'bt.poll': (0x40, 1, 0xfff0707f, 1, range(1)),
+    'bt.reap': (0x40, 2, 0xfff0707f, 1, range(1)),
+    'bt.lpq': (0x41, 0, 0xfe00707f, 0, range(32)),
+    'bt.spq': (0x41, 1, 0xfe00707f, 0, range(32)),
+}
 ROOT = Path(__file__).resolve().parents[3]
 FILES = {
     'scalar': 'hdl/chisel/src/coralnpu/scalar/Decode.scala',
@@ -21,19 +27,22 @@ FILES = {
 }
 
 
-def encode(name, rd, rs1):
-    if name not in OPS or not 1 <= rd <= 31 or not 0 <= rs1 <= 31:
+def encode(name, rd, rs1, rs2=0):
+    if name not in OPS:
+        raise ValueError('Unknown instruction')
+    funct7, funct3, _, minreg, rs2s = OPS[name]
+    if not minreg <= rd <= 31 or not 0 <= rs1 <= 31 or rs2 not in rs2s:
         raise ValueError('Reserved encoding')
-    return 0x8000000b | OPS[name] << 12 | rs1 << 15 | rd << 7
+    return funct7 << 25 | rs2 << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | 0x0b
 
 
 def decode(word):
     rd, rs1 = (word >> 7) & 31, (word >> 15) & 31
-    if not rd or not 0 <= word <= 0xffffffff:
+    if not 0 <= word <= 0xffffffff:
         return None
-    for name in OPS:
-        if word & MASK == 0x8000000b | OPS[name] << 12:
-            return name, rd, rs1
+    for name, (funct7, funct3, mask, minreg, _) in OPS.items():
+        if rd >= minreg and word & mask == funct7 << 25 | funct3 << 12 | 0x0b:
+            return name, rd, rs1, (word >> 20) & 31
     return None
 
 
@@ -107,32 +116,46 @@ def main():
     existing = scalar + floating + [(x, 0x7f) for x in rvv]
     # The actual FP decoder compares bits[6:2], so audit its broader mask.
     existing += [(x << 2, 0x7c) for x in fp]
-    for name in OPS:
-        proposed = encode(name, 1, 0) & MASK
-        if any(overlap(proposed, MASK, v, m) for v, m in existing):
+    proposal_masks = []
+    for name, (_, _, mask, _, _) in OPS.items():
+        proposed = encode(name, 1, 0) & mask
+        if any(overlap(proposed, mask, v, m) for v, m in existing):
             raise ValueError(f'Existing decoder collision: {name}')
+        if any(overlap(proposed, mask, v, m) for v, m in proposal_masks):
+            raise ValueError(f'Proposed instruction collision: {name}')
+        proposal_masks.append((proposed, mask))
 
     words = []
     asm = ['.text', '.option norvc', '.option norelax']
-    for name, rd, rs1 in itertools.product(OPS, range(1, 32), range(32)):
-        word = encode(name, rd, rs1)
-        if decode(word) != (name, rd, rs1):
-            raise ValueError('Round-trip failure')
-        words.append(word)
-        asm.append(f'.insn r 0x0b, {OPS[name]}, 0x40, x{rd}, x{rs1}, x0')
+    counts = {}
+    for name, (funct7, funct3, _, minreg, rs2s) in OPS.items():
+        counts[name] = 0
+        for rd, rs1, rs2 in itertools.product(range(minreg, 32), range(32),
+                                              rs2s):
+            word = encode(name, rd, rs1, rs2)
+            if decode(word) != (name, rd, rs1, rs2):
+                raise ValueError('Round-trip failure')
+            words.append(word)
+            asm.append(
+                f'.insn r 0x0b, {funct3}, {funct7}, x{rd}, x{rs1}, x{rs2}'
+            )
+            counts[name] += 1
     reserved_checks = 0
     for funct7, rs2, funct3 in itertools.product(range(128), range(32),
                                                  range(8)):
         word = (
             funct7 << 25 | rs2 << 20 | 1 << 15 | funct3 << 12 | 1 << 7 | 0x0b
         )
-        legal = funct7 == 0x40 and rs2 == 0 and funct3 in OPS.values()
+        legal = (funct7 == 0x40 and rs2 == 0 and funct3
+                 in (0, 1, 2)) or (funct7 == 0x41 and funct3 in (0, 1))
         if (decode(word) is not None) != legal:
             raise ValueError('Reserved field accepted or legal word rejected')
         reserved_checks += 1
     for name, rs1 in itertools.product(OPS, range(32)):
-        if decode(encode(name, 1, rs1) & ~(31 << 7)) is not None:
-            raise ValueError('rd=x0 accepted')
+        minreg = OPS[name][3]
+        if (decode(encode(name, 1, rs1) & ~(31 << 7))
+                is None) != (minreg == 1):
+            raise ValueError('Wrong zero register legality')
         reserved_checks += 1
     for word in words:
         for opcode in range(128):
@@ -172,6 +195,8 @@ def main():
         fp,
         'valid_register_combinations_assembled':
         len(words),
+        'combinations_by_instruction':
+        counts,
         'reserved_and_major_field_checks':
         reserved_checks,
         'assembler_command':

@@ -1,0 +1,34 @@
+{
+  "checks": 70521,
+  "seed": 103,
+  "footprint_bytes": {
+    "M1_G1": 1472,
+    "M1_G16": 20192,
+    "M8_G16": 35648,
+    "M1_G48": 60128,
+    "M8_G48": 104256
+  },
+  "status": "PASS",
+  "scope": "Python specification model and read-only source inspection; no RTL execution",
+  "source_sha256": {
+    "hdl/chisel/src/coralnpu/Parameters.scala": "be5a68ef65c30e6316c6f201be6ca641d5b1549c02c4bbe9052b03faebeef1a1",
+    "hdl/chisel/src/coralnpu/CoreAxi.scala": "a30cac7395d43c368ed884d11800d7892dabb1c8af3e24f036ec9997cb2c29a2",
+    "hdl/chisel/src/coralnpu/TCM.scala": "8e99dcccdfac91760ed388230622c7b8a34fe6565e428ef91233e294f087276e",
+    "hdl/chisel/src/coralnpu/SRAM.scala": "e9963cf96d23452934693f24b9909d6c69ea3faf2e0d5ed918988891d7ecbd25",
+    "hdl/chisel/src/coralnpu/Fabric.scala": "4ec2353994ef521159acbba660f7526686867aafccf326ade1a4994631c31106",
+    "hdl/chisel/src/coralnpu/BankedDtcm.scala": "d4e199b904d9ef053f92a3ff9e56ae5ae9c475dc0314bb1d1283b0e137f055ba",
+    "hdl/chisel/src/bus/TlulLocalXbar.scala": "af3330841826b8173233ab8562b128fbde90065eb2a2089b1a98ca955c8a4e2b",
+    "hdl/chisel/src/coralnpu/scalar/Lsu.scala": "d983c12e0638d7c153d9f9b5c585ced507fed3e0ff65bf2435b2499bbefc6b0b",
+    "hdl/chisel/src/coralnpu/rvv/RvvInterface.scala": "85572b37b417f8b9b979f5ad4761d00153fc51598e3e6572ef174667bc99fd80",
+    "alex/input/core/rtl/CoralF2Axi.sv": "65ddeaeb02aaf5920d79950b21cb98ae72ba3cec9ae2e91be178cfcb02e066a9",
+    "alex/input/core/rtl/TCM128_1.sv": "2ed92bd2d1d1136429e0d17c72d72492b4786239f8482dea6b1af72710e2c53e",
+    "alex/input/core/rtl/FabricMux.sv": "2af70f0f8b40173d20184cad3201033b18f110357ecf342ccff9ff16867721b3",
+    "alex/input/core/rtl/FabricArbiter.sv": "2b0c27938fdd9eba50bde60a8f0a9b9f75764e9437b3c48ffabe6762407582eb"
+  },
+  "checker_sha256": "a117f8c6b86fd6e36bb81dd59142ce59371f73af5a31f76d769571802d915eda",
+  "dtcm_base": "0x00010000",
+  "dtcm_bytes": 32768,
+  "service_bits": 128,
+  "service_ports": 1,
+  "independent_engine_port": false
+}

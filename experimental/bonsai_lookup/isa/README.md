@@ -1,4 +1,4 @@
-# Proposed Coral ternary command ISA, revision 0.1
+# Proposed Coral ternary ISA, revision 0.2
 
 Status: **proposal; no Coral decoder, assembler mnemonic, queue, DMA adapter or
 CPU instruction execution is implemented by this change.** This specification
@@ -10,14 +10,19 @@ the name and encodings are vendor-private proposals, not ratified extensions.
 
 ## Decision and exact instruction delta
 
-Add three scalar instructions: `bt.submit`, `bt.poll`, `bt.reap`. A descriptor
+Add three scalar queue instructions: `bt.submit`, `bt.poll`, `bt.reap`. A descriptor
 selects integer DOT128 or a complete ordered scaled tile. Reuse existing scalar
 and RVV memory operations for packing, standard fences for ordering, and existing
 VME integer/FP matrix instructions for other formats and fallback kernels.
-No new vector load/store, tile register, quantization instruction, FP CSR,
-interrupt source, or engine-count instruction is needed for revision 0.1.
+Add two architectural packed-memory instructions: **`bt.lpq` and `bt.spq`**,
+moving packed ternary bytes through an existing vector register. Their exact
+encodings, faults, tails and DTCM staging contract are in
+[packed memory and DTCM](packed-memory.md). These are ordinary synchronous LSU
+operations, not descriptor submissions or autonomous DMA copies. No new tile
+register, quantization instruction, FP CSR, interrupt source or engine-count
+instruction is added. Existing LHU/SH move raw FP16 scales without conversion.
 
-All are 32-bit R-format words, with `opcode=0x0b`, `funct7=0x40`, `rs2=x0`.
+The three queue operations are 32-bit R-format words, with `opcode=0x0b`, `funct7=0x40`, `rs2=x0`.
 `rs1` is an integer source and `rd` an integer destination; `rd=x0` is illegal
 to avoid silently losing ownership/status. `rd=rs1` is legal: read the old value
 before writeback. `rs1=x0` is legal and supplies zero. Every instruction occupies
@@ -127,7 +132,9 @@ not unsafe tag reuse. Polling remains possible during the stall.
 Descriptors are 64 bytes, 16-byte aligned, consisting of sixteen little-endian
 uint32 words. Address arithmetic uses a wider internal sum and rejects wrap;
 all ranges must lie wholly in the platform-authorized uncached shared buffer
-pool. This proposal creates no new address aperture or DMA access authority.
+pool, which may include DTCM only when the new adapter and firmware reservation
+are explicitly advertised. The address alone does not grant the current engine
+access to DTCM. This proposal creates no new aperture or DMA access authority.
 The current Alex 32-bit core view is distinct from host BAR4 offsets; never put
 the 64-bit host BAR4 offset into a descriptor. A platform integration must supply
 the pool bounds and access policy before advertising this ABI.
@@ -203,14 +210,14 @@ DOT produces exact int32 and no FP flags. Activation quantization remains a
 separate software/RVV kernel with a separately frozen numerical contract; the
 existing deterministic A8 fixtures do not validate model quantization quality.
 
-These instructions neither read nor change `frm`, `fflags`, `fcsr`, RVV vtype,
+The three queue instructions neither read nor change `frm`, `fflags`, `fcsr`, RVV vtype,
 vl/vstart, vector registers, VME tiles/mtype or mstatus FS/VS/MS. FP state is
 private to the command. Do not label its dedicated FPnew unit as reuse of the
 physical scalar FPU. The queue, ticket, accumulator and outstanding transactions
 are accelerator state owned by the driver, not ABI-preserved register state.
 Firmware must drain/reap before handing ownership to another context.
 
-Revision 0.1 targets Coral's machine-mode firmware environment. Lower-privilege
+Revision 0.2 targets Coral's machine-mode firmware environment. Lower-privilege
 execution, if added to the core, must trap rather than bypass memory policy.
 Absent extension, reserved encoding, or forbidden privilege raises the existing
 illegal-instruction fault with no side effects, original PC and instruction
@@ -302,7 +309,7 @@ lookup-only, not evidence for the direct-SIMD optimized path.
 
 | Work item | Required implementation and validation |
 | --- | --- |
-| Decode/dispatch | Add enableBonsai feature and exact masks; readsRs1/writesRd/rdMark, slot0-only, undefined fault, once-only acceptance, scalar response/writeback arbitration, flush/interrupt interlock; feature-off and all VME/RVV/FP regressions |
+| Decode/dispatch | Add enableBonsai feature and exact queue masks; readsRs1/writesRd/rdMark, slot0-only, undefined fault, once-only acceptance, scalar response/writeback arbitration, flush/interrupt interlock; add separately gated packed-memory decode and vector dependencies from packed-memory.md; feature-off and all VME/RVV/FP regressions |
 | Queue/descriptor | One slot, immutable descriptor snapshot, ticket/status FSM, range/alias checks, no reads on rejected submit, acquire/release semantics, every descriptor field/error/reap/stale-ticket test |
 | Memory service | Real AXI IDs and response routing, arbitration, CDC, pool policy, strobed output stores, write acknowledgements, error drain/epoch reset; current Alex master fixes IDs to zero so the standalone 16-tag bus cannot connect unchanged |
 | Storage | Bank/port/capacity plan for activation/weight buffers and accumulator; current register arrays do not establish mapped BRAM efficiency |
