@@ -1,0 +1,670 @@
+{
+  "scope": "Full projection-shape actual weight fixtures and independent HOST numerical references; no performance measurements",
+  "model_sha256": "de68ba48a8dacb21979915991e7741b917869d71410a370df951c0c3a237ae50",
+  "block_index": 0,
+  "endianness": "little",
+  "arithmetic": "dot_i32=sum(int8_activation*(PQ2_code-1)); per group p=RN32(dot*FP16_weight_scale); q=RN32(p*FP32_activation_scale); y=RN32(y+q), increasing K-group order, y initialized+0. No bias, activation function or fused FMA.",
+  "tensor_orders": {
+    "weights": "N,G,34 bytes",
+    "activations": "M,K",
+    "activation_scales": "M,G",
+    "group_dots": "M,N,G int32",
+    "scaled_outputs": "M,N float32"
+  },
+  "oracle_sources": {
+    "oracle.c": "7c2886c9b0acace719b9653d75f191be8a3721bf09379cb2c0332c78589fb6c1",
+    "prepare_layers.py": "c3a5e67aff5ef025a542319d8614ae0a00897f40882428d90d98b4055ce41a88"
+  },
+  "host_compiler": "Apple clang version 17.0.0 (clang-1700.6.4.2)",
+  "host_flags": [
+    "-O2",
+    "-fno-fast-math",
+    "-ffp-contract=off"
+  ],
+  "records": [
+    {
+      "role": "q",
+      "tensor": "blk.0.attn_q.weight",
+      "M": 1,
+      "N": 2048,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 1114112,
+      "weight_sha256": "2989ba546fe3159ec066d897eb795b7b2f6a7d94e72c1b9aa69f07039761faef",
+      "gguf_payload_offset": 90141280,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 103,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "q/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "d5c4ecf3a02c66d6ea12d8691504c16b245d65b30c8db486d2d0466148e1ef4f"
+        },
+        "q/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "q/decode.group_dots.i32": {
+          "bytes": 131072,
+          "sha256": "ada2450c7cf4872de042f4de081ef05db5281a508fa6301f2c88e880092c5bcf"
+        },
+        "q/decode.scaled_outputs.f32": {
+          "bytes": 8192,
+          "sha256": "8ad65441d050d6192cc9e7ffc6acd782f4bf71f617d098175f95b474d5515172"
+        }
+      },
+      "useful_mac_equivalents": 4194304,
+      "existing_tile_jobs": 1024,
+      "existing_tile_read_bytes": 1245184,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "q",
+      "tensor": "blk.0.attn_q.weight",
+      "M": 32,
+      "N": 2048,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 1114112,
+      "weight_sha256": "2989ba546fe3159ec066d897eb795b7b2f6a7d94e72c1b9aa69f07039761faef",
+      "gguf_payload_offset": 90141280,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 103,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "q/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "27a01db382f33d9bfb9c45e1aeb97bbcbd27e57bebb5abdb4f54ac7921797069"
+        },
+        "q/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "q/prefill32.group_dots.i32": {
+          "bytes": 4194304,
+          "sha256": "68afc3934f54c5ffa2963ca32a5ac2c01a13cd4b917fb9a5666c1113a2c63976"
+        },
+        "q/prefill32.scaled_outputs.f32": {
+          "bytes": 262144,
+          "sha256": "9e09944424963608a29fd14a3ff03f43ed5bdaf167633db6442b825c1b77c186"
+        }
+      },
+      "useful_mac_equivalents": 134217728,
+      "existing_tile_jobs": 4096,
+      "existing_tile_read_bytes": 8650752,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "k",
+      "tensor": "blk.0.attn_k.weight",
+      "M": 1,
+      "N": 1024,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 557056,
+      "weight_sha256": "8b64fac0ac3aab516fad85e9e38b80e1868a6f4f75f3b3c43e4fcf8533dfe724",
+      "gguf_payload_offset": 88461408,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 104,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "k/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "78b9e49a14fe15bc84694812a9eeccc7c6c255cbca29b468ab48f0a2e4a06cec"
+        },
+        "k/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "k/decode.group_dots.i32": {
+          "bytes": 65536,
+          "sha256": "a7991b72edaecbde4e13b3ff1286ca3972fd0da1c64046c3740e2b1e376b6b07"
+        },
+        "k/decode.scaled_outputs.f32": {
+          "bytes": 4096,
+          "sha256": "31cc7e4a93292303100058310b6d244a4a4383df47b87c9a04ca446a37bbbd3b"
+        }
+      },
+      "useful_mac_equivalents": 2097152,
+      "existing_tile_jobs": 512,
+      "existing_tile_read_bytes": 622592,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "k",
+      "tensor": "blk.0.attn_k.weight",
+      "M": 32,
+      "N": 1024,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 557056,
+      "weight_sha256": "8b64fac0ac3aab516fad85e9e38b80e1868a6f4f75f3b3c43e4fcf8533dfe724",
+      "gguf_payload_offset": 88461408,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 104,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "k/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "cfe37686faf6a8bb75145c71beeb96c7b0e2df77259dbc8c4f7d187f2038bfd3"
+        },
+        "k/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "k/prefill32.group_dots.i32": {
+          "bytes": 2097152,
+          "sha256": "01a53be106ad9ddafd289537105b6e2c87251b59ed90b92c74f6615592a12a05"
+        },
+        "k/prefill32.scaled_outputs.f32": {
+          "bytes": 131072,
+          "sha256": "5482648fcef3a7f5b946a58e38285eab4c8d68b36e1b52964825192de1d3280c"
+        }
+      },
+      "useful_mac_equivalents": 67108864,
+      "existing_tile_jobs": 2048,
+      "existing_tile_read_bytes": 4325376,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "v",
+      "tensor": "blk.0.attn_v.weight",
+      "M": 1,
+      "N": 1024,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 557056,
+      "weight_sha256": "c56901fd3c3b6773437afc58792e761f65537c6258753118699bf81967c9b065",
+      "gguf_payload_offset": 91255904,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 105,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "v/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "53ba3cbc63943689c233ccc3dfce65d8e69935d360ff2e996b7ce28e09c8c3c8"
+        },
+        "v/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "v/decode.group_dots.i32": {
+          "bytes": 65536,
+          "sha256": "604a935ca5bac40e0cbf0da1855bb335f74324a830b3632f41a1f90194171b31"
+        },
+        "v/decode.scaled_outputs.f32": {
+          "bytes": 4096,
+          "sha256": "98b22aad5d6be61dafcb711cff2fb44d1e88c08aa8faa3447efe104f4c11ce7f"
+        }
+      },
+      "useful_mac_equivalents": 2097152,
+      "existing_tile_jobs": 512,
+      "existing_tile_read_bytes": 622592,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "v",
+      "tensor": "blk.0.attn_v.weight",
+      "M": 32,
+      "N": 1024,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 557056,
+      "weight_sha256": "c56901fd3c3b6773437afc58792e761f65537c6258753118699bf81967c9b065",
+      "gguf_payload_offset": 91255904,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 105,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "v/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "e72e5ecf6eb4b6ad64916adb35fd014ffc4329d616a39c4baadebf3e6bb5bf9e"
+        },
+        "v/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "v/prefill32.group_dots.i32": {
+          "bytes": 2097152,
+          "sha256": "71ebe9f79d487431675d8311fa7644917b8d7af41cb3f3f95b571847aafe38ea"
+        },
+        "v/prefill32.scaled_outputs.f32": {
+          "bytes": 131072,
+          "sha256": "114152da993f4cc4d6543fb338bd54398f62bf32915873279a2e86745a10af24"
+        }
+      },
+      "useful_mac_equivalents": 67108864,
+      "existing_tile_jobs": 2048,
+      "existing_tile_read_bytes": 4325376,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "output",
+      "tensor": "blk.0.attn_output.weight",
+      "M": 1,
+      "N": 2048,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 1114112,
+      "weight_sha256": "615bab830a3c504c2322986e9be2df80745a4f41430016e759801f8806c109db",
+      "gguf_payload_offset": 89027168,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 106,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "output/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "7fe794d0ff3089493b757206ac186664be753691dfe25c1a2e7fd19e9eee990b"
+        },
+        "output/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "output/decode.group_dots.i32": {
+          "bytes": 131072,
+          "sha256": "819711780b1472039de6aa561fe1470e40e00e07576cd8b32327e63a5fefc9f5"
+        },
+        "output/decode.scaled_outputs.f32": {
+          "bytes": 8192,
+          "sha256": "649d6e1a471a9574802be7c884312b91e93f2194ace336763897da2a96d65f90"
+        }
+      },
+      "useful_mac_equivalents": 4194304,
+      "existing_tile_jobs": 1024,
+      "existing_tile_read_bytes": 1245184,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "output",
+      "tensor": "blk.0.attn_output.weight",
+      "M": 32,
+      "N": 2048,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 1114112,
+      "weight_sha256": "615bab830a3c504c2322986e9be2df80745a4f41430016e759801f8806c109db",
+      "gguf_payload_offset": 89027168,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 106,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "output/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "6449f1a629540cc1469313de4b9f132a780b5b6e555a10c93c5d9417990b2482"
+        },
+        "output/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "output/prefill32.group_dots.i32": {
+          "bytes": 4194304,
+          "sha256": "ef48933b9255cc2ff5624b1b65f7c3c9c2a4746160bde593477b9c0c7e5fe904"
+        },
+        "output/prefill32.scaled_outputs.f32": {
+          "bytes": 262144,
+          "sha256": "0957d28e1e2d1bfac3ff693e285d21535a0a2f23f660faf0bf2da6310f5bd2d2"
+        }
+      },
+      "useful_mac_equivalents": 134217728,
+      "existing_tile_jobs": 4096,
+      "existing_tile_read_bytes": 8650752,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "gate",
+      "tensor": "blk.0.ffn_gate.weight",
+      "M": 1,
+      "N": 6144,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "7b69ee687a7f3772106bf27faaf6a1773ba0c08b01d7c01c6d6018c6ecd33b74",
+      "gguf_payload_offset": 95155296,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 107,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "gate/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "19999dfc869960b0cd2712ff1a6c1cb56574ee7859fd85a2735529bca3bd2989"
+        },
+        "gate/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "gate/decode.group_dots.i32": {
+          "bytes": 393216,
+          "sha256": "20c3f55d1585b2472ae4755df4c965bf49445fb74a8a97aab8cbb03c11c4c790"
+        },
+        "gate/decode.scaled_outputs.f32": {
+          "bytes": 24576,
+          "sha256": "83325f51a017f898100c009cb936f9a7c18e45e0e6d2b79ca2ebdefcb8f01a34"
+        }
+      },
+      "useful_mac_equivalents": 12582912,
+      "existing_tile_jobs": 3072,
+      "existing_tile_read_bytes": 3735552,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "gate",
+      "tensor": "blk.0.ffn_gate.weight",
+      "M": 32,
+      "N": 6144,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "7b69ee687a7f3772106bf27faaf6a1773ba0c08b01d7c01c6d6018c6ecd33b74",
+      "gguf_payload_offset": 95155296,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 107,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "gate/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "7048a479483dcc55a08759520c0a4360ad765cf824e362682e658e643a7c7480"
+        },
+        "gate/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "gate/prefill32.group_dots.i32": {
+          "bytes": 12582912,
+          "sha256": "ca0559b065ca281cf91429a9f2028e6247d20742bec6a8e42cdec16441871b19"
+        },
+        "gate/prefill32.scaled_outputs.f32": {
+          "bytes": 786432,
+          "sha256": "4ac2cb44fc6f567325d863fbe8e7ee31a5b47dc6ea340a33bfa037b6c4190e69"
+        }
+      },
+      "useful_mac_equivalents": 402653184,
+      "existing_tile_jobs": 12288,
+      "existing_tile_read_bytes": 25952256,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "up",
+      "tensor": "blk.0.ffn_up.weight",
+      "M": 1,
+      "N": 6144,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "77bb352163f92efc98f3fe3c49f231a39e947c91a38b5f36bd2726e235b4e3e3",
+      "gguf_payload_offset": 98505824,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 108,
+      "host_status": "PASS",
+      "independent_python_group_checks": 64,
+      "files": {
+        "up/decode.activations.i8": {
+          "bytes": 2048,
+          "sha256": "85a50721e4c5159f3fb7b5c23e3270a698f650e6c10017823abb0a0534c7144e"
+        },
+        "up/decode.activation_scales.f32": {
+          "bytes": 64,
+          "sha256": "a46653fe1ffb634806f1cf63512f663f34eac826556e203851c5467fe1b54e02"
+        },
+        "up/decode.group_dots.i32": {
+          "bytes": 393216,
+          "sha256": "d12bd55586dff78e7fb5a7b06e3447fb365cf6e7e53df284eb13f22afcac40cd"
+        },
+        "up/decode.scaled_outputs.f32": {
+          "bytes": 24576,
+          "sha256": "cc0931ffe1a4f9d2fdd1dbb16f5185e306e0567b452324e1cf1e32c60b7e844c"
+        }
+      },
+      "useful_mac_equivalents": 12582912,
+      "existing_tile_jobs": 3072,
+      "existing_tile_read_bytes": 3735552,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "up",
+      "tensor": "blk.0.ffn_up.weight",
+      "M": 32,
+      "N": 6144,
+      "K": 2048,
+      "groups_per_row": 16,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "77bb352163f92efc98f3fe3c49f231a39e947c91a38b5f36bd2726e235b4e3e3",
+      "gguf_payload_offset": 98505824,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 108,
+      "host_status": "PASS",
+      "independent_python_group_checks": 128,
+      "files": {
+        "up/prefill32.activations.i8": {
+          "bytes": 65536,
+          "sha256": "9589b0e769835259701db9a22be82c2f38f1850512816ac6a6bd917ffd644b32"
+        },
+        "up/prefill32.activation_scales.f32": {
+          "bytes": 2048,
+          "sha256": "083e245f2da4539191b2825709e6b6bc1010795cb7a4a13051a92e86b92d6c98"
+        },
+        "up/prefill32.group_dots.i32": {
+          "bytes": 12582912,
+          "sha256": "7d7a5ac3de6a187fe34fb83d3190c2711d2ba63847842a9c75c6e755c95124a8"
+        },
+        "up/prefill32.scaled_outputs.f32": {
+          "bytes": 786432,
+          "sha256": "70b96bc7cf68e5e7426a6d7978f1b1b4d8378f396c03861912e0977872bc9899"
+        }
+      },
+      "useful_mac_equivalents": 402653184,
+      "existing_tile_jobs": 12288,
+      "existing_tile_read_bytes": 25952256,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "down",
+      "tensor": "blk.0.ffn_down.weight",
+      "M": 1,
+      "N": 2048,
+      "K": 6144,
+      "groups_per_row": 48,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "3195b87477e9b3a136bc5da156f329ae8a5fe29ab1759139efba29f3d5cf04a3",
+      "gguf_payload_offset": 91812960,
+      "mode": "decode",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 109,
+      "host_status": "PASS",
+      "independent_python_group_checks": 192,
+      "files": {
+        "down/decode.activations.i8": {
+          "bytes": 6144,
+          "sha256": "f9c08770d0a7f8952ee07462af9de6cfd9064d178910b772c5078714a474689c"
+        },
+        "down/decode.activation_scales.f32": {
+          "bytes": 192,
+          "sha256": "217cead52fac72edda3acf0b2add9506ca1a045d9e89894c1244cce63f037693"
+        },
+        "down/decode.group_dots.i32": {
+          "bytes": 393216,
+          "sha256": "48d58913812594bcc62cec0bca622c465ce84aed8a4b684cfac7790ae468cd1a"
+        },
+        "down/decode.scaled_outputs.f32": {
+          "bytes": 8192,
+          "sha256": "42d8b4873820a918abe8f3b03424faaa5534ed93393951491f5d0aa5dd069004"
+        }
+      },
+      "useful_mac_equivalents": 12582912,
+      "existing_tile_jobs": 3072,
+      "existing_tile_read_bytes": 3735552,
+      "weight_reloads_in_existing_cold_tile_schedule": 1,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    },
+    {
+      "role": "down",
+      "tensor": "blk.0.ffn_down.weight",
+      "M": 32,
+      "N": 2048,
+      "K": 6144,
+      "groups_per_row": 48,
+      "native_weight_bytes": 3342336,
+      "weight_sha256": "3195b87477e9b3a136bc5da156f329ae8a5fe29ab1759139efba29f3d5cf04a3",
+      "gguf_payload_offset": 91812960,
+      "mode": "prefill32",
+      "activation_scope": "Deterministic synthetic signed-int8 operands and explicit power-of-two FP32 scales; NOT captured model activations and NOT a validated Bonsai quantizer",
+      "seed": 109,
+      "host_status": "PASS",
+      "independent_python_group_checks": 384,
+      "files": {
+        "down/prefill32.activations.i8": {
+          "bytes": 196608,
+          "sha256": "a6f26f3492f5daf81fcac02d938c069ccefade19b51057f18213ffc59cb03f77"
+        },
+        "down/prefill32.activation_scales.f32": {
+          "bytes": 6144,
+          "sha256": "5b2b3ba6d5f72713bd8ef41bc5226417db846c55ec34ce5f6c63e2d8725978c4"
+        },
+        "down/prefill32.group_dots.i32": {
+          "bytes": 12582912,
+          "sha256": "d6dac940f93fe6f199fb0355897b5f296e867c6472c80dc07a59bbf04f6cc6e1"
+        },
+        "down/prefill32.scaled_outputs.f32": {
+          "bytes": 262144,
+          "sha256": "e59fd7843cd5cb59569e7c3920e3373c40a647c3010242ddbcb9fe546ecd841f"
+        }
+      },
+      "useful_mac_equivalents": 402653184,
+      "existing_tile_jobs": 12288,
+      "existing_tile_read_bytes": 25952256,
+      "weight_reloads_in_existing_cold_tile_schedule": 4,
+      "read_bytes_scope": "Exact cold tile schedule input payload. Includes repeated activations across N tiles, repeated weights across token tiles; excludes output writes, descriptor, scale/reduce and layer sequencer costs.",
+      "Arcsim_integer_groups": "NOT_RUN",
+      "Arcsim_full_scaled_layer": "NOT_IMPLEMENTED_IN_RTL",
+      "FPGA_integer_groups": "NOT_RUN",
+      "FPGA_full_scaled_layer": "NOT_RUN",
+      "cycles": null,
+      "measured_useful_bandwidth_GB_per_s": null,
+      "layer_seconds": null
+    }
+  ]
+}

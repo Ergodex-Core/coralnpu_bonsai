@@ -1,0 +1,145 @@
+{
+  "scope": "Host cross-mode checks and local Icarus tile compatibility; no full-layer Arcsim or FPGA performance",
+  "cases": [
+    {
+      "role": "q",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "q",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "k",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 992,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "k",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 992,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "v",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 992,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "v",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 992,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "output",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "output",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "gate",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 6112,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "gate",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 6112,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "up",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 6112,
+      "source_token_base": 0,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "up",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 6112,
+      "source_token_base": 24,
+      "source_K_group": 15,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "down",
+      "mode": "decode",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 0,
+      "source_K_group": 47,
+      "result": "RESULT engines=6 lookup=1 M=1 N=32 lanes=128 cycles=123 load_cycles=109 bytes=1216 outputs=6 request_stall=24 output_stall=1 exact_values=32 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    },
+    {
+      "role": "down",
+      "mode": "prefill32",
+      "status": "PASS_RTL_TILE_ONLY",
+      "source_row_base": 2016,
+      "source_token_base": 24,
+      "source_K_group": 47,
+      "result": "RESULT engines=6 lookup=1 M=8 N=32 lanes=128 cycles=309 load_cycles=181 bytes=2112 outputs=48 request_stall=40 output_stall=24 exact_values=256 reset_test=0",
+      "scope": "One last tile/group, not full projection execution"
+    }
+  ]
+}

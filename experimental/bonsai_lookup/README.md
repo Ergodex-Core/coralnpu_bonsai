@@ -163,3 +163,11 @@ INT8 baseline. Only a complete model path can supply inference numbers: matched
 prompt/context/batch, prefill token count and timing, TTFT including agreed setup,
 steady decode TPS, and complete request latency. Report reset/loading separately
 and disclose concurrency. Standalone dot tiles cannot substantiate model TPS.
+
+## Full projection fixtures
+
+[Layer fixture preparation](layers/README.md) now covers complete native block0
+Q/K/V/output and gate/up/down shapes at M1 and M32, with all integer group dots
+and ordered FP32 scaled-projection references. These are host correctness
+references; measured full-layer Arcsim and physical FPGA results remain pending.
+The existing one-group RTL is unchanged.
