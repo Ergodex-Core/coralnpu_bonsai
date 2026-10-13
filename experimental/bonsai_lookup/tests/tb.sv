@@ -3,7 +3,7 @@ module tb;
   parameter integer ENGINES = 2;
   parameter integer LOOKUP = 1;
   reg clk = 0;
-  always #5 clk = ~clk;
+  always #20 clk = ~clk;  // 40 ns period: modeled 25 MHz for every variant.
   reg rst_n = 0, job_valid = 0, rd_ready = 0, rsp_valid = 0, rsp_error = 0, out_ready = 0;
   reg [  3:0] job_m;
   reg [  5:0] job_n;

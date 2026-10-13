@@ -3,7 +3,7 @@
   "sources": {
     "rtl/bonsai_dot_cluster.sv": "6e004436ec9aa4818bf37d82e99cb82d2c68cf4962b9c996ad99ee2234381dff",
     "rtl/bonsai_matmul_tile.sv": "92a1d6c9af7b87fb87b23e37fb2ef0fe620bb935b847f5ec1beb3a853e1bd4a7",
-    "tests/tb.sv": "c0f79e9514a502589c87bef279d1bf0dc2452deb06825253af07498d46e39e86"
+    "tests/tb.sv": "3655dbb36ce4791e2fe061cee95dd6c93f4aae80a5d95577a475fc4188c2fd42"
   },
   "oracle_source_sha256": "5637c137b6bd3e27c30a663d5abed1b7ec1a4d2772e2665d7bccc63c2f447a7e",
   "memory_contract": {
