@@ -1,0 +1,23 @@
+\newcommand{\reportdate}{2026-10-14}
+\newcommand{\macinfo}{Apple M2 Max, 32 GiB}
+\newcommand{\correctnesstable}{%
+\begin{tabular}{lp{3.6cm}p{4.6cm}l}\toprule
+Model & Backend & Generated text & Tokens match MLX\\\midrule
+FunctionGemma 270M & MLX functiongemma-270m-it-bf16 & The capital of France is Paris. & reference\\
+FunctionGemma 270M & FPGA (F2, native kernels) & The capital of France is Paris. & yes\\
+Gemma 3 1B & MLX gemma-3-1b-it-qat-4bit & The capital of France is Paris. & reference\\
+Gemma 3 1B & FPGA (F2, native kernels) & \emph{run in progress} & --\\
+\bottomrule\end{tabular}}
+\newcommand{\fpgatable}{%
+\begin{tabular}{llrrrrr}\toprule
+Model & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\midrule
+FunctionGemma 270M & chat & 16 & 8 & 66.8 & 27.7 & 0.0361\\
+Gemma 3 1B & \emph{runs in progress} & & & & & \\
+\bottomrule\end{tabular}}
+\newcommand{\mlxtable}{%
+\begin{tabular}{llrrrr}\toprule
+Model & MLX checkpoint & ISL & OSL & TTFT (s) & tok/s\\\midrule
+FunctionGemma 270M & functiongemma-270m-it-bf16 & 16 & 8 & 1.130 & 53.0\\
+Gemma 3 1B & gemma-3-1b-it-qat-4bit & 16 & 8 & 0.960 & 56.9\\
+\bottomrule\end{tabular}}
+\newcommand{\profilenote}{}
