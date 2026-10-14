@@ -20,8 +20,10 @@
 // After each 32-wide group the tile is drained (one row per active token),
 // converted to f32, offset-corrected, scaled and accumulated in DTCM.
 //
-// Args: m tokens (<=16), k, n; in0 = xq int8 [16][k]; in1 = sx f32 [16][k/32];
-// in2 = xsum8 f32 [16][k/32] (8 * sum of the group's xq); in3 = weight tiles
+// Args: m tokens (<=16), k, n; in0 = xq int8 k-major [k][16] (quant_act
+// layout); in1 = sx f32 [16][k/32];
+// in2 = xsum8 f32 [16][k/32] (8 * sum of the group's xq); u3 = row-major
+// xq [16][k] (optional; used when m == 1); in3 = weight tiles
 // (see kernel_args.h); out0 = out f32 rows of u0 floats (stride), u1 = tile
 // offset (first output channel / 16, lets the host split large n across
 // launches); u2 = scales base f32 [n/16][k/32][16]; flags bit0: accumulate
@@ -37,7 +39,7 @@ static float acc[MAX_TOKENS][TILE_N] __attribute__((aligned(16)));
 
 // One Q4_0 group: configure, zero tile 0, 8 steps of 4 k each.
 static inline __attribute__((always_inline)) void group_matmul(
-    const int8_t* xq, uint32_t stride, const uint8_t* w, uint32_t tm) {
+    const int8_t* xq, const uint8_t* w, uint32_t tm) {
   __asm__ volatile(
       "li t5, %[mtype]\n\t"
       "li t6, %[vtype]\n\t"
@@ -49,14 +51,15 @@ static inline __attribute__((always_inline)) void group_matmul(
       ".word %[vtzero]\n\t"
       "li t6, 8\n\t"
       "1:\n\t"
-      // A rows j: xq[0..15][k0 + j], stride k bytes.
-      "vlse8.v v8, (%[xq]), %[stride]\n\t"
-      "addi t4, %[xq], 1\n\t"
-      "vlse8.v v10, (t4), %[stride]\n\t"
-      "addi t4, %[xq], 2\n\t"
-      "vlse8.v v12, (t4), %[stride]\n\t"
-      "addi t4, %[xq], 3\n\t"
-      "vlse8.v v14, (t4), %[stride]\n\t"
+      // A rows j: xqT[k0 + j][0..15], 16 contiguous bytes each (k-major
+      // layout written by quant_act), one bus transaction per row.
+      "vle8.v v8, (%[xq])\n\t"
+      "addi t4, %[xq], 16\n\t"
+      "vle8.v v10, (t4)\n\t"
+      "addi t4, %[xq], 32\n\t"
+      "vle8.v v12, (t4)\n\t"
+      "addi t4, %[xq], 48\n\t"
+      "vle8.v v14, (t4)\n\t"
       // B rows: 32 packed bytes -> 4 nibble rows (unsigned 0..15).
       "vle8.v v24, (%[w])\n\t"
       "addi t4, %[w], 16\n\t"
@@ -66,16 +69,61 @@ static inline __attribute__((always_inline)) void group_matmul(
       "vand.vi v20, v25, 15\n\t"
       "vsrl.vi v22, v25, 4\n\t"
       ".word %[vtmms]\n\t"
-      "addi %[xq], %[xq], 4\n\t"
+      "addi %[xq], %[xq], 64\n\t"
       "addi %[w], %[w], 32\n\t"
       "addi t6, t6, -1\n\t"
       "bnez t6, 1b\n\t"
       : [xq] "+r"(xq), [w] "+r"(w)
-      : [stride] "r"(stride), [tm] "r"(tm),
+      : [tm] "r"(tm),
         [mtype] "i"(zvt_mtype(ZVT_TE, 4, 3)), [vtype] "i"(ZVT_VTYPE_SEW8_LMUL1),
         [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0))
       : "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
         "v20", "v22", "v24", "v25");
+}
+
+// Decode fast path (tm == 1): only lane 0 of each A row matters, so the four
+// rows of a step are the bytes xq1d[k0 .. k0+3] at lane 0. One 32-byte load
+// covers four steps; rows come from register slides instead of bus reads.
+static inline __attribute__((always_inline)) void group_matmul_1d(
+    const int8_t* xq1d, const uint8_t* w) {
+  __asm__ volatile(
+      "li t5, %[mtype]\n\t"
+      "li t6, %[vtype]\n\t"
+      MSETMTYPE
+      "li t5, 1\n\t"
+      MSETTM
+      "li t5, 16\n\t"
+      MSETTN
+      ".word %[vtzero]\n\t"
+      "li t6, 2\n\t"
+      "2:\n\t"
+      "vle8.v v26, (%[xq])\n\t"          // 16 bytes: k0 .. k0+15 (16 k)
+      "li t5, 4\n\t"
+      "1:\n\t"
+      "vmv.v.v v8, v26\n\t"               // row 0: lane 0 = xq[k]
+      "vslidedown.vi v10, v26, 1\n\t"     // row 1: lane 0 = xq[k+1]
+      "vslidedown.vi v12, v26, 2\n\t"
+      "vslidedown.vi v14, v26, 3\n\t"
+      "vle8.v v24, (%[w])\n\t"
+      "addi t4, %[w], 16\n\t"
+      "vle8.v v25, (t4)\n\t"
+      "vand.vi v16, v24, 15\n\t"
+      "vsrl.vi v18, v24, 4\n\t"
+      "vand.vi v20, v25, 15\n\t"
+      "vsrl.vi v22, v25, 4\n\t"
+      ".word %[vtmms]\n\t"
+      "vslidedown.vi v26, v26, 4\n\t"     // next 4 k
+      "addi %[w], %[w], 32\n\t"
+      "addi t5, t5, -1\n\t"
+      "bnez t5, 1b\n\t"
+      "addi %[xq], %[xq], 16\n\t"
+      "addi t6, t6, -1\n\t"
+      "bnez t6, 2b\n\t"
+      : [xq] "+r"(xq1d), [w] "+r"(w)
+      : [mtype] "i"(zvt_mtype(ZVT_TE, 4, 3)), [vtype] "i"(ZVT_VTYPE_SEW8_LMUL1),
+        [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0))
+      : "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
+        "v20", "v22", "v24", "v25", "v26");
 }
 
 // Drain row m of tile 0 and accumulate: acc[m] += (row - xsum8) * sx * ws.
@@ -118,6 +166,7 @@ static int run(KernelArgs* a) {
   if (m == 0 || m > MAX_TOKENS || k % Q4_GROUP || n % TILE_N) return 1;
   const uint32_t groups = k / Q4_GROUP, tiles = n / TILE_N;
   const int8_t* xq = (const int8_t*)a->in0;
+  const int8_t* xq1d = (const int8_t*)a->u3;  // row-major xq[0][k], decode path
   const float* sx = (const float*)a->in1;
   const float* xsum8 = (const float*)a->in2;
   const uint8_t* w = (const uint8_t*)a->in3;
@@ -132,7 +181,10 @@ static int run(KernelArgs* a) {
     const uint8_t* wt = w + (uint32_t)(tile0 + t) * TILE_BYTES(k);
     const float* wst = ws + (uint32_t)(tile0 + t) * groups * TILE_N;
     for (uint32_t g = 0; g < groups; ++g) {
-      group_matmul(xq + g * Q4_GROUP, k, wt + g * TILE_GROUP_BYTES, m);
+      if (m == 1 && xq1d)
+        group_matmul_1d(xq1d + g * Q4_GROUP, wt + g * TILE_GROUP_BYTES);
+      else
+        group_matmul(xq + g * Q4_GROUP * MAX_TOKENS, wt + g * TILE_GROUP_BYTES, m);
       config_acc();
       for (uint32_t i = 0; i < m; ++i)
         drain_row(i, xsum8 + i * groups + g, sx + i * groups + g,

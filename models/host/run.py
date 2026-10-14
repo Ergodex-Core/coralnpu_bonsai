@@ -64,7 +64,13 @@ def main():
   parser.add_argument("--prompt", action="append", default=[])
   parser.add_argument("--prompts-file", default=None)
   parser.add_argument("--raw", action="store_true", help="no chat template")
-  parser.add_argument("--max-tokens", type=int, default=16)
+  parser.add_argument("--max-tokens", type=int, default=16,
+                      help="output tokens (OSL)")
+  parser.add_argument("--ignore-eos", action="store_true",
+                      help="always generate max-tokens (fixed OSL)")
+  parser.add_argument("--isl", type=int, action="append", default=[],
+                      help="synthesize a raw prompt of exactly this many "
+                      "tokens (repeatable); measures TTFT/TPS per length")
   parser.add_argument("--cache-length", type=int, default=128)
   parser.add_argument("--out", default=None)
   parser.add_argument("--verbose", action="store_true")
@@ -78,9 +84,15 @@ def main():
       for item in json.load(f):
         prompts.append({"text": item, "raw": args.raw} if isinstance(item, str)
                        else {"text": item["text"], "raw": item.get("raw", args.raw)})
+  tok = load_tokenizer(args.tokenizer or cfg["tokenizer"])
+  filler = ("The quick brown fox jumps over the lazy dog while the sun sets "
+            "behind the distant mountains and the river flows quietly. ")
+  for isl in args.isl:
+    ids = tok.encode(filler * (isl // 8 + 2), add_special_tokens=False).ids
+    prompts.append({"text": None, "raw": True, "ids": [2] + ids[:isl - 1],
+                    "label": f"isl{isl}"})
   if not prompts:
     sys.exit("no prompts")
-  tok = load_tokenizer(args.tokenizer or cfg["tokenizer"])
 
   if args.backend == "f2":
     backend = dev.F2Backend(args.slot)
@@ -91,20 +103,29 @@ def main():
                               cache_length=args.cache_length, verbose=args.verbose)
 
   results = []
+  stop = () if args.ignore_eos else STOP
   for item in prompts:
-    text = item["text"] if item["raw"] else format_chat(item["text"])
-    ids = tok.encode(text, add_special_tokens=False).ids
-    if not ids or ids[0] != 2:
-      ids = [2] + ids  # <bos>
-    generated, steps, prefill = model.generate(ids, args.max_tokens, STOP)
-    decode = [s["seconds"] for s in steps if s["tokens"] == 1][1:] or [1e-9]
+    if item.get("ids"):
+      ids = item["ids"]
+    else:
+      text = item["text"] if item["raw"] else format_chat(item["text"])
+      ids = tok.encode(text, add_special_tokens=False).ids
+      if not ids or ids[0] != 2:
+        ids = [2] + ids  # <bos>
+    label = item.get("label") or item["text"]
+    generated, steps, prefill = model.generate(ids, args.max_tokens, stop)
+    decode = [s["seconds"] for s in steps if s["tokens"] == 1] or [1e-9]
     out_text = tok.decode([t for t in generated if t not in STOP])
-    results.append(dict(prompt=item["text"], raw=item["raw"], prompt_ids=ids,
+    results.append(dict(prompt=label, raw=item["raw"], prompt_ids=ids,
                         generated=generated, text=out_text, steps=steps,
-                        prefill_seconds=prefill,
-                        decode_tokens_per_second=len(decode) / sum(decode)))
-    print(f"> {item['text']!r}\n{out_text!r}\n  prefill {prefill:.2f}s, "
-          f"decode {results[-1]['decode_tokens_per_second']:.3f} tok/s")
+                        isl=len(ids), osl=len(generated),
+                        ttft_seconds=prefill, prefill_seconds=prefill,
+                        decode_tokens_per_second=len(decode) / sum(decode),
+                        total_seconds=prefill + sum(decode)))
+    r = results[-1]
+    print(f"> {label!r}  ISL={r['isl']} OSL={r['osl']}\n{out_text!r}\n"
+          f"  TTFT {prefill:.2f}s  decode {r['decode_tokens_per_second']:.4f} tok/s  "
+          f"({1 / r['decode_tokens_per_second']:.1f} s/token)  total {r['total_seconds']:.1f}s")
   if args.verbose:
     print(model.profile_report())
   record = dict(model=cfg["model"], source="native", device=args.backend,

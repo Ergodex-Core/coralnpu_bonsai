@@ -38,12 +38,13 @@ static float dot(const float* x, const float* y, uint32_t len) {
       "add %[y], %[y], t1\n\t"
       "sub %[n], %[n], t0\n\t"
       "bnez %[n], 1b\n\t"
-      "vsetvli t0, %[len], e32, m8, ta, ma\n\t"
+      "li t1, 32\n\t"
+      "vsetvli t0, t1, e32, m8, ta, ma\n\t"
       "vfmv.s.f v8, %[zero]\n\t"
       "vfredusum.vs v8, v24, v8\n\t"
       "vfmv.f.s %[out], v8\n\t"
       : [out] "=f"(out), [x] "+r"(x), [y] "+r"(y), [n] "+r"(len)
-      : [len] "r"(len), [zero] "f"(0.0f)
+      : [zero] "f"(0.0f)
       : "t0", "t1", "memory", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
         "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24", "v25", "v26",
         "v27", "v28", "v29", "v30", "v31");

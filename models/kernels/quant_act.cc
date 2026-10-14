@@ -14,8 +14,10 @@
 //
 // Per-token, per-group (32) symmetric int8 activation quantization:
 //   sx = max|x| / 127, xq = round(x / sx) in [-127, 127], xsum8 = 8 * sum(xq).
-// Args: m, k; in0 = x f32 [16][u0 stride floats]; out0 = xq int8 [16][k];
-// out1 = sx f32 [16][k/32]; in1 = xsum8 f32 [16][k/32] (output).
+// Args: m, k; in0 = x f32 [16][u0 stride floats]; out0 = xq int8 in k-major
+// layout [k][16] (row i of token m at byte k*16 + m, so the matvec loads one
+// contiguous 16-byte A row per k); out1 = sx f32 [16][k/32]; in1 = xsum8 f32
+// [16][k/32] (output); in3 = row-major xq int8 [16][k] (output, decode path).
 #include "models/common/kernel_args.h"
 
 static int run(KernelArgs* a) {
@@ -24,7 +26,8 @@ static int run(KernelArgs* a) {
   const uint32_t groups = k / Q4_GROUP;
   for (uint32_t i = 0; i < m; ++i) {
     const float* x = (const float*)a->in0 + i * stride;
-    int8_t* xq = (int8_t*)a->out0 + i * k;
+    int8_t* xq = (int8_t*)a->out0 + i;  // + k * 16 per element
+    int8_t* xq1d = (int8_t*)a->in3 + i * k;
     float* sx = (float*)a->out1 + i * groups;
     float* xsum8 = (float*)a->in1 + i * groups;
     for (uint32_t g = 0; g < groups; ++g) {
@@ -54,9 +57,11 @@ static int run(KernelArgs* a) {
           "vnclip.wi v16, v8, 0\n\t"
           "vsetvli t0, %[n], e8, m2, ta, ma\n\t"
           "vnclip.wi v20, v16, 0\n\t"
-          "vse8.v v20, (%[xq])\n\t"
+          "vsse8.v v20, (%[xq]), %[stride]\n\t"   // k-major: stride 16
+          "vse8.v v20, (%[xq1d])\n\t"             // row-major copy
           : [sum] "=r"(sum)
-          : [inv] "f"(inv), [n] "r"(Q4_GROUP), [xq] "r"(xq + g * Q4_GROUP)
+          : [inv] "f"(inv), [n] "r"(Q4_GROUP), [xq] "r"(xq + g * Q4_GROUP * MAX_TOKENS),
+            [stride] "r"(MAX_TOKENS), [xq1d] "r"(xq1d + g * Q4_GROUP)
           : "t0", "memory", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
             "v16", "v17", "v18", "v19", "v20", "v21", "v24");
       sx[g] = s;

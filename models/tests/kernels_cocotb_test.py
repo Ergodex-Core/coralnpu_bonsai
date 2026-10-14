@@ -70,6 +70,13 @@ async def setup(dut):
   return Harness(fx)
 
 
+def kmajor(xq):
+  """[M,K] int8 -> device layout [K][16]."""
+  out = np.zeros((xq.shape[1], 16), np.int8)
+  out[:, :xq.shape[0]] = xq.T
+  return out
+
+
 def pad16(x):
   out = np.zeros((16,) + x.shape[1:], x.dtype)
   out[:x.shape[0]] = x
@@ -86,7 +93,7 @@ async def test_quant_act(dut):
   xq, sx, xs = h.alloc(16 * k), h.alloc(16 * k // 32 * 4), h.alloc(16 * k // 32 * 4)
   await h.launch("quant_act", m=m, k=k, in0=xin, out0=xq, out1=sx, in1=xs, u0=k)
   rq, rs, rsum = R.quant_act(x)
-  np.testing.assert_array_equal(await h.get(xq, np.int8, (m, k)), rq)
+  np.testing.assert_array_equal((await h.get(xq, np.int8, (k, 16)))[:, :m].T, rq)
   np.testing.assert_allclose(await h.get(sx, np.float32, (m, k // 32)), rs, rtol=1e-6)
   np.testing.assert_array_equal(await h.get(xs, np.float32, (m, k // 32)), rsum)
 
@@ -101,7 +108,7 @@ async def test_matvec_q4(dut):
   nib, sc = W.quantize_q4_0(w)
   tiles, scales = W.pack_tiles(nib, sc)
   xq, sx, xsum8 = R.quant_act(x)
-  a_xq, a_sx, a_xs = await h.put(pad16(xq)), await h.put(pad16(sx)), await h.put(pad16(xsum8))
+  a_xq, a_sx, a_xs = await h.put(kmajor(xq)), await h.put(pad16(sx)), await h.put(pad16(xsum8))
   a_w, a_ws = await h.put(tiles), await h.put(scales)
   out = h.alloc(16 * n * 4)
   await h.launch("matvec_q4", m=m, k=k, n=n, in0=a_xq, in1=a_sx, in2=a_xs, in3=a_w,
@@ -192,10 +199,10 @@ async def test_embed(dut):
 async def test_topk(dut):
   h = await setup(dut)
   rng = np.random.default_rng(7)
-  x = rng.standard_normal(300).astype(np.float32)
+  x = rng.standard_normal(320).astype(np.float32)
   xin = await h.put(x)
   out = h.alloc(64)
-  await h.launch("topk", n=300, in0=xin, out0=out, u0=8)
+  await h.launch("topk", n=320, in0=xin, out0=out, u0=8)
   idx = await h.get(out, np.uint32, (8,))
   val = await h.get(out + 32, np.float32, (8,))
   ridx, rval = R.topk(x, 8)

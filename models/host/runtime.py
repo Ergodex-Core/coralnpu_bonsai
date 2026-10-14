@@ -82,9 +82,14 @@ class GemmaNative:
     self.S = cache_length
     self.kernels = {k: dev.KernelImage(os.path.join(kernels_dir, k + ".elf"))
                     for k in KERNELS}
-    self.ddr = Arena(*backend.ddr, "DDR")
-    self.hbm = Arena(*backend.hbm, "HBM") if backend.hbm else self.ddr
+    # The core reads wrong data from the first bytes of a window (seen on the
+    # F2 image at 0xC0000000), so the first 64 KiB of each window is unused.
+    skip = 0x10000
+    self.ddr = Arena(backend.ddr[0] + skip, backend.ddr[1] - skip, "DDR")
+    self.hbm = (Arena(backend.hbm[0] + skip, backend.hbm[1] - skip, "HBM")
+                if backend.hbm else self.ddr)
     self.profile = {}
+    self.trace = None  # optional callback(stage: str, layer: int | None)
     self._load_weights(os.path.join(weights_dir, "weights.npz"))
     self._alloc_buffers()
     self._write_rope_tables()
@@ -117,7 +122,8 @@ class GemmaNative:
         x=a(MAX_TOKENS * self.D * f32),       # residual stream
         xn=a(MAX_TOKENS * self.D * f32),      # normed input
         h=a(MAX_TOKENS * self.D * f32),       # after attention block
-        xq=a(MAX_TOKENS * kmax),              # int8 activations
+        xq=a(MAX_TOKENS * kmax),              # k-major
+        xq1d=a(MAX_TOKENS * kmax),            # row-major (decode path)              # int8 activations
         sx=a(MAX_TOKENS * (kmax // GROUP) * f32),
         xsum8=a(MAX_TOKENS * (kmax // GROUP) * f32),
         q=a(MAX_TOKENS * self.nh * self.hd * f32),
@@ -156,18 +162,23 @@ class GemmaNative:
 
   def _quant(self, src, m, k, stride=None):
     self._launch("quant_act", m=m, k=k, in0=src, out0=self.b["xq"],
-                 out1=self.b["sx"], in1=self.b["xsum8"], u0=stride or k)
+                 out1=self.b["sx"], in1=self.b["xsum8"], in3=self.b["xq1d"],
+                 u0=stride or k)
 
   def _matvec(self, wname, m, k, n, out, out_stride, accumulate=False):
     self._launch("matvec_q4", m=m, k=k, n=n, in0=self.b["xq"], in1=self.b["sx"],
                  in2=self.b["xsum8"], in3=self.w[wname + ".tiles"],
-                 u2=self.w[wname + ".scales"], out0=out, u0=out_stride, u1=0,
-                 flags=1 if accumulate else 0)
+                 u2=self.w[wname + ".scales"], u3=self.b["xq1d"], out0=out,
+                 u0=out_stride, u1=0, flags=1 if accumulate else 0)
 
   def _rmsnorm(self, src, scale, out, m, k, stride=None, residual=None):
     self._launch("rmsnorm", m=m, k=k, in0=src, in1=scale, out0=out,
                  in2=residual or 0, flags=1 if residual else 0,
                  u0=stride or k, f0=EPS)
+
+  def _t(self, stage, layer=None):
+    if self.trace:
+      self.trace(stage, layer)
 
   def _layer(self, i, m, pos0):
     b, w = self.b, self.w
@@ -178,11 +189,14 @@ class GemmaNative:
     vc = b["vcache"] + i * self.S * hd * 4
     # Attention block.
     self._rmsnorm(b["x"], w[f"l{i}.pre_attn"], b["xn"], m, D)
+    self._t("xn_attn", i)
     self._quant(b["xn"], m, D)
     self._matvec(f"l{i}.q", m, D, nh * hd, b["q"], nh * hd)
     self._matvec(f"l{i}.kv", m, D, 2 * hd, b["kv"], 2 * hd)
+    self._t("qkv", i)
     self._rmsnorm(b["q"], w[f"l{i}.q_norm"], b["q"], m * nh, hd)
     self._rmsnorm(b["kv"], w[f"l{i}.k_norm"], b["kv"], m, hd, stride=2 * hd)
+    self._t("qk_norm", i)
     self._launch("rope", m=m, n=nh * hd, in0=b["q"], in1=cos, in2=sin, u0=pos0,
                  u1=nh, u2=hd)
     self._launch("rope", m=m, n=2 * hd, in0=b["kv"], in1=cos, in2=sin, u0=pos0,
@@ -190,17 +204,24 @@ class GemmaNative:
     self._launch("attention", m=m, n=nh * hd, in0=b["q"], in1=kc, in2=vc,
                  out0=b["attn"], u0=pos0, u1=nh, u2=hd,
                  u3=self.cfg["window"] if local else 0, f0=hd ** -0.5)
+    self._t("rope", i)
+    self._t("attn", i)
     self._quant(b["attn"], m, nh * hd)
     self._matvec(f"l{i}.o", m, nh * hd, D, b["ao"], D)
+    self._t("o_proj", i)
     self._rmsnorm(b["ao"], w[f"l{i}.post_attn"], b["h"], m, D, residual=b["x"])
+    self._t("h", i)
     # MLP block.
     self._rmsnorm(b["h"], w[f"l{i}.pre_ffw"], b["xn"], m, D)
     self._quant(b["xn"], m, D)
     self._matvec(f"l{i}.gate_up", m, D, 2 * H, b["gate_up"], 2 * H)
+    self._t("gate_up", i)
     self._launch("gelu_mul", m=m, k=H, in0=b["gate_up"], out0=b["act"])
     self._quant(b["act"], m, H)
     self._matvec(f"l{i}.down", m, H, D, b["ao"], D)
+    self._t("down", i)
     self._rmsnorm(b["ao"], w[f"l{i}.post_ffw"], b["x"], m, D, residual=b["h"])
+    self._t("x", i)
 
   # --- public ----------------------------------------------------------------
 
@@ -217,12 +238,14 @@ class GemmaNative:
     self.be.write_array(b["tokens"], np.asarray(tokens, dtype=np.uint32))
     self._launch("embed", m=m, k=self.D, in0=b["tokens"], in1=w["embed.tiles"],
                  in2=w["embed.scales"], out0=b["x"], f0=math.sqrt(self.D))
+    self._t("embed")
     for i in range(self.L):
       self._layer(i, m, pos0)
     last = b["x"] + (m - 1) * self.D * 4
     self._rmsnorm(last, w["final_norm"], b["xn"], 1, self.D)
     self._quant(b["xn"], 1, self.D)
     self._matvec("embed", 1, self.D, self.V, b["logits"], self.V)
+    self._t("logits")
     self._launch("topk", n=self.V, in0=b["logits"], out0=b["topk"], u0=TOPK)
     raw = self.be.read(b["topk"], 64)
     idx = np.frombuffer(raw[:32], dtype=np.uint32)

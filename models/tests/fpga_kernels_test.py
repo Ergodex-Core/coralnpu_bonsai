@@ -62,6 +62,13 @@ class Harness:
     return r
 
 
+def kmajor(xq):
+  """[M,K] int8 -> device layout [K][16]."""
+  out = np.zeros((xq.shape[1], 16), np.int8)
+  out[:, :xq.shape[0]] = xq.T
+  return out
+
+
 def pad16(x):
   out = np.zeros((16,) + x.shape[1:], x.dtype)
   out[:x.shape[0]] = x
@@ -69,9 +76,9 @@ def pad16(x):
 
 
 def case_topk(h):
-  x = np.random.default_rng(7).standard_normal(300).astype(np.float32)
+  x = np.random.default_rng(7).standard_normal(320).astype(np.float32)
   out = h.alloc(64)
-  h.launch("topk", n=300, in0=h.put(x), out0=out, u0=8)
+  h.launch("topk", n=320, in0=h.put(x), out0=out, u0=8)
   ridx, rval = R.topk(x, 8)
   np.testing.assert_array_equal(h.get(out, np.uint32, (8,)), ridx)
   np.testing.assert_array_equal(h.get(out + 32, np.float32, (8,)), rval)
@@ -82,9 +89,11 @@ def case_quant_act(h):
   m, k = 3, 96
   x = rng.standard_normal((m, k)).astype(np.float32)
   xq, sx, xs = h.alloc(16 * k), h.alloc(16 * 3 * 4), h.alloc(16 * 3 * 4)
-  h.launch("quant_act", m=m, k=k, in0=h.put(pad16(x)), out0=xq, out1=sx, in1=xs, u0=k)
+  xq1d = h.alloc(16 * k)
+  h.launch("quant_act", m=m, k=k, in0=h.put(pad16(x)), out0=xq, out1=sx, in1=xs, in3=xq1d, u0=k)
   rq, rs, rsum = R.quant_act(x)
-  np.testing.assert_array_equal(h.get(xq, np.int8, (m, k)), rq)
+  np.testing.assert_array_equal(h.get(xq, np.int8, (k, 16))[:, :m].T, rq)
+  np.testing.assert_array_equal(h.get(xq1d, np.int8, (m, k)), rq)
   np.testing.assert_allclose(h.get(sx, np.float32, (m, 3)), rs, rtol=1e-6)
   np.testing.assert_array_equal(h.get(xs, np.float32, (m, 3)), rsum)
 
@@ -98,7 +107,7 @@ def case_matvec_q4(h):
   tiles, scales = W.pack_tiles(nib, sc)
   xq, sx, xsum8 = R.quant_act(x)
   out = h.alloc(16 * n * 4)
-  h.launch("matvec_q4", m=m, k=k, n=n, in0=h.put(pad16(xq)), in1=h.put(pad16(sx)),
+  h.launch("matvec_q4", m=m, k=k, n=n, in0=h.put(kmajor(xq)), in1=h.put(pad16(sx)),
            in2=h.put(pad16(xsum8)), in3=h.put(tiles), u2=h.put(scales), out0=out,
            u0=n, u1=0)
   got = h.get(out, np.float32, (m, n))
@@ -173,7 +182,34 @@ def case_embed(h):
   np.testing.assert_allclose(h.get(out, np.float32, (3, D)), ref, rtol=1e-6)
 
 
-CASES = [("topk", case_topk), ("quant_act", case_quant_act), ("rmsnorm", case_rmsnorm),
+def case_matvec_decode(h):
+  rng = np.random.default_rng(11)
+  k, n = 1152, 64
+  x = rng.standard_normal((1, k)).astype(np.float32)
+  w = rng.standard_normal((n, k)).astype(np.float32) * 0.1
+  nib, sc = W.quantize_q4_0(w)
+  tiles, scales = W.pack_tiles(nib, sc)
+  xq, sx, xsum8 = R.quant_act(x)
+  out = h.alloc(16 * n * 4)
+  h.launch("matvec_q4", m=1, k=k, n=n, in0=h.put(kmajor(xq)), in1=h.put(pad16(sx)),
+           in2=h.put(pad16(xsum8)), in3=h.put(tiles), u2=h.put(scales), u3=h.put(pad16(xq)),
+           out0=out, u0=n, u1=0)
+  got = h.get(out, np.float32, (1, n))
+  ref = R.matvec_q4(xq, sx, xsum8, nib, sc)
+  np.testing.assert_allclose(got, ref, rtol=1e-4, atol=1e-4)
+  print(f"  decode k={k} n={n}: max |err| {np.abs(got - ref).max():.2e}")
+
+
+def case_topk_big(h):
+  x = np.random.default_rng(8).standard_normal(262144).astype(np.float32)
+  out = h.alloc(64)
+  h.launch("topk", n=262144, in0=h.put(x), out0=out, u0=8)
+  ridx, rval = R.topk(x, 8)
+  np.testing.assert_array_equal(h.get(out, np.uint32, (8,)), ridx)
+  np.testing.assert_array_equal(h.get(out + 32, np.float32, (8,)), rval)
+
+
+CASES = [("topk", case_topk), ("topk_big", case_topk_big), ("matvec_decode", case_matvec_decode), ("quant_act", case_quant_act), ("rmsnorm", case_rmsnorm),
          ("gelu_mul", case_gelu_mul), ("embed", case_embed), ("rope", case_rope),
          ("attention", case_attention), ("matvec_q4", case_matvec_q4)]
 

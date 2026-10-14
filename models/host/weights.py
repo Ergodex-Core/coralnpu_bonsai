@@ -115,13 +115,37 @@ def _hf_files(repo_or_dir, patterns):
   return snapshot_download(repo_or_dir, allow_patterns=patterns)
 
 
+_ST_DTYPES = {"F32": np.float32, "F16": np.float16, "BF16": "bf16",
+              "I8": np.int8, "U8": np.uint8, "I32": np.int32}
+
+
+def _read_safetensors(path):
+  """Reads a .safetensors file with numpy only; bf16 is widened to f32."""
+  with open(path, "rb") as f:
+    n = int.from_bytes(f.read(8), "little")
+    header = json.loads(f.read(n))
+    data = f.read()
+  out = {}
+  for name, info in header.items():
+    if name == "__metadata__":
+      continue
+    start, end = info["data_offsets"]
+    raw = data[start:end]
+    kind = _ST_DTYPES[info["dtype"]]
+    if kind == "bf16":
+      arr = (np.frombuffer(raw, np.uint16).astype(np.uint32) << 16).view(np.float32)
+    else:
+      arr = np.frombuffer(raw, kind)
+    out[name] = arr.reshape(info["shape"])
+  return out
+
+
 def load_safetensors(repo_or_dir):
-  from safetensors.numpy import load_file  # pylint: disable=g-import-not-at-top
   local = _hf_files(repo_or_dir, ["*.safetensors", "*.json"])
   state = {}
   for f in sorted(os.listdir(local)):
     if f.endswith(".safetensors"):
-      state.update(load_file(os.path.join(local, f)))
+      state.update(_read_safetensors(os.path.join(local, f)))
   out = {}
   for name, v in state.items():
     for prefix in ("model.", "language_model.model."):
