@@ -1,0 +1,57 @@
+{
+  "shapes": [
+    {
+      "N": 151669,
+      "K": 2048,
+      "count": 1
+    },
+    {
+      "N": 1024,
+      "K": 2048,
+      "count": 56
+    },
+    {
+      "N": 2048,
+      "K": 2048,
+      "count": 56
+    },
+    {
+      "N": 2048,
+      "K": 6144,
+      "count": 28
+    },
+    {
+      "N": 6144,
+      "K": 2048,
+      "count": 56
+    }
+  ],
+  "workloads": {
+    "1": {
+      "MACs": 1719904256,
+      "head_last_position_only": true,
+      "ideal_weights_bytes_one_scan": 241861536,
+      "weights_bytes_token_tile8": 241861536
+    },
+    "8": {
+      "MACs": 11584907264,
+      "head_last_position_only": true,
+      "ideal_weights_bytes_one_scan": 241861536,
+      "weights_bytes_token_tile8": 241861536
+    },
+    "32": {
+      "MACs": 45407774720,
+      "head_last_position_only": true,
+      "ideal_weights_bytes_one_scan": 241861536,
+      "weights_bytes_token_tile8": 836404128
+    },
+    "128": {
+      "MACs": 180699244544,
+      "head_last_position_only": true,
+      "ideal_weights_bytes_one_scan": 241861536,
+      "weights_bytes_token_tile8": 3214574496
+    }
+  },
+  "model_image_bytes": 242357184,
+  "expanded_int8_weights_only_bytes": 1719904256
+}

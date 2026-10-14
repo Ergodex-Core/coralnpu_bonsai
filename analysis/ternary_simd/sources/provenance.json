@@ -1,0 +1,8 @@
+{
+  "coral_source": "382b5c12030ad8eb74ab8deafb2529301faeab16",
+  "bonsai_source": "8bbf3a5a",
+  "image_dcp_sha256": "2c8f2dbfe98ddf68535eab374d1a1f21095dc3adffdbf86aec444b1961f2d6e5",
+  "canonical_Q1_manifest_sha256": "21c664d0c029dc7f12440ad93a7fa6688c2b9e78b2143f6e9c179956793a7391",
+  "physical_matrix_evidence": "Retained matrix-01 physical receipt,2026-10-12, raw source file SHA256 c01134ba62fba543f6c7189c1ea059fde39352a6812e44d2fd1eee86dd4dd4be",
+  "scope": "Inputs are snapshots, not live measurements from this script."
+}

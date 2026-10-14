@@ -1,0 +1,59 @@
+{
+  "file": "Ternary-Bonsai-1.7B-PQ2_0.gguf",
+  "sha256": "de68ba48a8dacb21979915991e7741b917869d71410a370df951c0c3a237ae50",
+  "bytes": 463290464,
+  "GGUF_version": 3,
+  "tensor_count": 310,
+  "formats": {
+    "0": 113,
+    "142": 197
+  },
+  "PQ2_shapes": [
+    {
+      "N": 151669,
+      "K": 2048,
+      "count": 1
+    },
+    {
+      "N": 1024,
+      "K": 2048,
+      "count": 56
+    },
+    {
+      "N": 2048,
+      "K": 2048,
+      "count": 56
+    },
+    {
+      "N": 2048,
+      "K": 6144,
+      "count": 28
+    },
+    {
+      "N": 6144,
+      "K": 2048,
+      "count": 56
+    }
+  ],
+  "PQ2_groups": 13436752,
+  "PQ2_payload_bytes": 456849568,
+  "code_counts": [
+    531316607,
+    658033822,
+    530553827,
+    0
+  ],
+  "code_to_weight": [
+    -1,
+    0,
+    1,
+    2
+  ],
+  "actual_block_dot_checks": 1182,
+  "widths": [
+    32,
+    64,
+    128
+  ],
+  "scope": "Actual native weight inventory and host dot equality; not RTL/model inference or activation quantizer validation"
+}

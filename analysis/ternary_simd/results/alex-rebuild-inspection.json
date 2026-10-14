@@ -1,0 +1,35 @@
+{
+  "listed_objects": 1533,
+  "listed_bytes": 32052748,
+  "downloaded_files": 303,
+  "RTL_manifest_entries": 247,
+  "RTL_missing": [],
+  "RTL_mismatches": [],
+  "comparisons": {
+    "input/rtl/cl_coralnpu.sv": {
+      "sha256": "072ca9670205f27f6938768baf9c9f220fce4a629c67fb605ebfe6d1d930529a",
+      "previous_sha256": "072ca9670205f27f6938768baf9c9f220fce4a629c67fb605ebfe6d1d930529a",
+      "identical": true
+    },
+    "input/build_config.json": {
+      "sha256": "4c3073437660a5ddabd35893d3763f27f4f0a3e7aee4ee53b461e516d192b647",
+      "previous_sha256": "4c3073437660a5ddabd35893d3763f27f4f0a3e7aee4ee53b461e516d192b647",
+      "identical": true
+    },
+    "input/build_settings.tcl": {
+      "sha256": "452facd608aceba0942ed9fa5dfe503b41dc489f93abcd806517046d6e9cd87b",
+      "previous_sha256": "452facd608aceba0942ed9fa5dfe503b41dc489f93abcd806517046d6e9cd87b",
+      "identical": true
+    },
+    "hdk_inputs.json": {
+      "sha256": "6c1d7ba31b73bcb042571945780517cf4e538786a533f4bdee6ef031cb3bd835",
+      "previous_sha256": "6c1d7ba31b73bcb042571945780517cf4e538786a533f4bdee6ef031cb3bd835",
+      "identical": true
+    }
+  },
+  "compilation_unit_sha256": "c204aa4caa78c8b4653be64ffefb0df91992ec342cb54f29ea3aed03469aa1a7",
+  "compilation_unit_matches_signoff": true,
+  "hdk_input_count": 120,
+  "package_root_verification_files_in_supplied_prefix": false,
+  "build_or_scripts_executed": false
+}

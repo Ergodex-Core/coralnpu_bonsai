@@ -1,0 +1,74 @@
+[
+  {
+    "accelerable_fraction": 0.5,
+    "e2e_target": 2,
+    "required_kernel_speedup": null,
+    "limit_infinite_kernel": 2.0
+  },
+  {
+    "accelerable_fraction": 0.5,
+    "e2e_target": 5,
+    "required_kernel_speedup": null,
+    "limit_infinite_kernel": 2.0
+  },
+  {
+    "accelerable_fraction": 0.6,
+    "e2e_target": 2,
+    "required_kernel_speedup": 6.000000000000001,
+    "limit_infinite_kernel": 2.5
+  },
+  {
+    "accelerable_fraction": 0.6,
+    "e2e_target": 5,
+    "required_kernel_speedup": null,
+    "limit_infinite_kernel": 2.5
+  },
+  {
+    "accelerable_fraction": 0.7,
+    "e2e_target": 2,
+    "required_kernel_speedup": 3.5000000000000004,
+    "limit_infinite_kernel": 3.333333333333333
+  },
+  {
+    "accelerable_fraction": 0.7,
+    "e2e_target": 5,
+    "required_kernel_speedup": null,
+    "limit_infinite_kernel": 3.333333333333333
+  },
+  {
+    "accelerable_fraction": 0.8,
+    "e2e_target": 2,
+    "required_kernel_speedup": 2.6666666666666665,
+    "limit_infinite_kernel": 5.000000000000001
+  },
+  {
+    "accelerable_fraction": 0.8,
+    "e2e_target": 5,
+    "required_kernel_speedup": null,
+    "limit_infinite_kernel": 5.000000000000001
+  },
+  {
+    "accelerable_fraction": 0.9,
+    "e2e_target": 2,
+    "required_kernel_speedup": 2.25,
+    "limit_infinite_kernel": 10.000000000000002
+  },
+  {
+    "accelerable_fraction": 0.9,
+    "e2e_target": 5,
+    "required_kernel_speedup": 8.999999999999996,
+    "limit_infinite_kernel": 10.000000000000002
+  },
+  {
+    "accelerable_fraction": 0.95,
+    "e2e_target": 2,
+    "required_kernel_speedup": 2.111111111111111,
+    "limit_infinite_kernel": 19.999999999999982
+  },
+  {
+    "accelerable_fraction": 0.95,
+    "e2e_target": 5,
+    "required_kernel_speedup": 6.333333333333335,
+    "limit_infinite_kernel": 19.999999999999982
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "file": "ternary-systolic-array-3c74aa0c.txt",
+    "source_url": "https://github.com/Ergodex-Core/bonsai_on_chip/blob/3c74aa0c3eb3dc3bb1b3d079ba8539c211db1616/doc/microarch/ternary-systolic-array.md",
+    "sha256": "8e5be7a3050d01bcf3b1d4d9f7dcfd89ba493b71fe11b70a762f75948801361d"
+  },
+  {
+    "file": "array-review-3c74aa0c.txt",
+    "source_url": "https://github.com/Ergodex-Core/bonsai_on_chip/blob/3c74aa0c3eb3dc3bb1b3d079ba8539c211db1616/doc/microarch/ternary-systolic-array-review.md",
+    "sha256": "3aee42ab770061c5215f0b055221fbdef0169233372736211fdc976a1884e3fc"
+  },
+  {
+    "file": "ternary-systolic-array-aa69172d.txt",
+    "source_url": "https://github.com/Ergodex-Core/bonsai_on_chip/blob/aa69172d09ff944360e3c3e2bdaf2e1d9cebeb44/doc/microarch/ternary-systolic-array.md",
+    "sha256": "34089ce077bf2fb3873e399ec5380c51db1ac2e4890c971ab3db0341dc2598a1"
+  },
+  {
+    "file": "hbm-review-aa69172d.txt",
+    "source_url": "https://github.com/Ergodex-Core/bonsai_on_chip/blob/aa69172d09ff944360e3c3e2bdaf2e1d9cebeb44/doc/microarch/hbm-rom-equivalent-review.md",
+    "sha256": "ec259754c7978007dfcfe39c78a52a311937ff628b4963a9efd42d318f7d24b7"
+  }
+]
