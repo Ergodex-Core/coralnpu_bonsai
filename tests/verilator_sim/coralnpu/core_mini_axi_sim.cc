@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include <chrono>
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <thread>
@@ -43,6 +45,7 @@ ABSL_FLAG(bool, backdoor_load, false, "Enable high-speed backdoor code loading")
 static bool run(const char* name, const std::string binary, const int cycles,
                 const bool trace, const bool debug_axi, const bool instr_trace,
                 const bool backdoor_load) {
+  const auto began = std::chrono::steady_clock::now();
   absl::Mutex halted_mtx;
   absl::CondVar halted_cv;
   CoreMiniAxi_tb tb(CoreMiniAxi_tb::kCoreMiniAxiModelName, cycles, /* random= */ false, debug_axi,
@@ -78,7 +81,20 @@ static bool run(const char* name, const std::string binary, const int cycles,
 
   sc_stop();
   sc_main_thread.join();
-  return (!tb.io_fault && !(tb.tohost_halt && tb.tohost_val != 1));
+  const bool ok = !tb.io_fault && !(tb.tohost_halt && tb.tohost_val != 1);
+
+  // Same format as the ArcSim harness (tests/arcsim_sim) so simulator
+  // performance can be compared run for run. The testbench clock is 1 ns.
+  const double wall = std::chrono::duration<double>(
+                          std::chrono::steady_clock::now() - began)
+                          .count();
+  const unsigned long long sim_cycles = static_cast<unsigned long long>(
+      sc_time_stamp() / sc_time(1, SC_NS));
+  printf("VERILATOR %s model=%s cycles=%llu wall_s=%.3f cycles_per_s=%.0f\n",
+         ok ? "PASS" : "FAIL", name, sim_cycles, wall,
+         wall > 0 ? sim_cycles / wall : 0.0);
+  fflush(stdout);
+  return ok;
 }
 
 extern "C" int sc_main(int argc, char** argv) {

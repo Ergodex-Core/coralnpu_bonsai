@@ -16,6 +16,7 @@
 # //tests/verilator_sim:*_axi_sim and take the same command line. All targets
 # are tagged "arcsim" and need `--config=arcsim` (see doc/arcsim.md).
 
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(
     "//hdl/chisel/src/coralnpu:flags.bzl",
@@ -113,4 +114,42 @@ _DIFF_TESTS = {
         tags = ["arcsim"],
     )
     for core, (verilator, elfs) in _DIFF_TESTS.items()
+]
+
+# Performance comparison: `bazel run --config=arcsim :<core>_perf -- [--cpu N]`
+# prints a Verilator-vs-ArcSim cycles/s table for a few workloads.
+py_binary(
+    name = "compare_perf",
+    srcs = ["compare_perf.py"],
+)
+
+_RVV_PERF_ELFS = [
+    "//examples:coralnpu_v2_hello_world_add_floats",
+    "//tests/cocotb/rvv/ml_ops:rvv_matmul.elf",
+    "//tests/cocotb/rvv/ml_ops:rvv_float_matmul_optimized.elf",
+]
+
+_PERF = {
+    "core_mini_axi": (
+        "//tests/verilator_sim:core_mini_axi_sim",
+        ["//examples:coralnpu_v2_hello_world_add_floats"],
+    ),
+    "rvv_core_mini_axi": ("//tests/verilator_sim:rvv_core_mini_axi_sim", _RVV_PERF_ELFS),
+    "vme_core_mini_axi": (None, _RVV_PERF_ELFS),
+}
+
+[
+    py_binary(
+        name = core + "_perf",
+        srcs = ["compare_perf.py"],
+        args = [
+            "--label=" + core,
+            "--arcsim=$(rootpath :{}_sim)".format(core),
+            "--verilator=" + ("$(rootpath {})".format(verilator) if verilator else "none"),
+        ] + ["$(rootpaths {})".format(elf) for elf in elfs],
+        data = [":{}_sim".format(core)] + ([verilator] if verilator else []) + elfs,
+        main = "compare_perf.py",
+        tags = ["arcsim"],
+    )
+    for core, (verilator, elfs) in _PERF.items()
 ]

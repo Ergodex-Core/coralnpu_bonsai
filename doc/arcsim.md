@@ -93,6 +93,51 @@ pass/fail results. They report cycle counts but don't compare them.
 bazel test --config=arcsim //tests/arcsim_sim:all
 ```
 
+## Performance comparison
+
+Both simulators print a summary line when they exit. ArcSim prints
+`ARCSIM PASS ... cycles=... wall_s=...` and Verilator prints
+`VERILATOR PASS ... cycles=... wall_s=...`. The `*_perf` targets run each
+workload on both simulators, alternating the order, and print a Markdown table
+of median wall time, cycles per second and ArcSim's speedup:
+
+```sh
+bazel run --config=arcsim //tests/arcsim_sim:rvv_core_mini_axi_perf -- --runs=3 --cpu=3
+```
+
+The default workloads are the examples plus two RVV matmul kernels. Pin runs
+to an idle CPU with `--cpu` for stable numbers.
+
+To build and compare all three cores on a Linux x86-64 host, such as an EC2
+instance, in one step:
+
+```sh
+utils/arcsim/run_perf.sh --runs 3 --cpu 3
+```
+
+The script never uses sudo. It reports any missing packages and writes results
+to `perf-results/<timestamp>/`.
+
+## CI on Blacksmith
+
+`.github/workflows/sim-blacksmith.yml` runs on Blacksmith runners
+(`blacksmith-16vcpu-ubuntu-2404`). It has two jobs:
+
+- **verilator** builds the Verilator simulators and runs the examples.
+- **arcsim** installs the developer bundle, runs the differential tests, and
+  then runs all three `*_perf` comparisons on the same machine. The tables go
+  to the job summary and the JSON results are uploaded as an artifact.
+
+Before the workflow can run:
+
+1. Install the Blacksmith GitHub app on the organization.
+2. Add the repository secret `ARCSIM_BUNDLE_URL`. It must be an HTTPS URL for
+   the bundle zip, such as a presigned S3 link. Without it, the ArcSim job
+   skips its steps and says so in the summary.
+
+Blacksmith runners are shared. Treat CI timings as a trend rather than a
+benchmark.
+
 ## Options
 
 - `--//rules:arcsim_assertions=false` builds with `--ignore-assertions
