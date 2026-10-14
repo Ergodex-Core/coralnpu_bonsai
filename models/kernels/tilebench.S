@@ -15,7 +15,7 @@
 // Tile-load bandwidth microbenchmark (pure assembly). Streams kargs.n bytes
 // from kargs.in0 in 256-byte steps:
 //   flags = 0: 16 x vle8.v (16 B each) into v8 (baseline, same as membench)
-//   flags = 1: one vtle8 tile load (16 rows x 16 B) per 256 B, row mode
+//   flags = 1: 16 x vtle8 (one 16-byte tile slice each) per 256 B
 //   flags = 2: 16 x vle8 with LMUL1 into 16 different registers (v0..v15)
 //              back to back (tests load overlap)
 // kargs layout: see models/common/kernel_args.h (m,k,n,flags,in0,...).
@@ -42,9 +42,13 @@ main:
     li   t5, 16
     .insn r 0x57, 7, 0x42, t6, t5, x0     // msettn 16
     .insn r 0x57, 7, 0x42, t6, t5, x1     // msettm 16
-    li   t4, 0                            // tss: tile 0, row 0
-1:  .insn r 0x07, 7, 0x09, zero, a2, t4   // vtle8 zero, (a2), t4
-    addi a2, a2, 256
+    // A tile load moves one 16-byte slice (row tss[3:0]) per instruction.
+1:  li   t4, 0                            // tss: tile 0, row 0
+2:  .insn r 0x07, 7, 0x09, zero, a2, t4   // vtle8 zero, (a2), t4
+    addi a2, a2, 16
+    addi t4, t4, 1
+    andi t5, t4, 15
+    bnez t5, 2b
     addi a3, a3, -256
     bnez a3, 1b
     j    .Ldone
