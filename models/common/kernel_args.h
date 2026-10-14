@@ -60,7 +60,7 @@ typedef struct {
 
 static inline uint32_t rdcycle(void) {
   uint32_t c;
-  __asm__ volatile("rdcycle %0" : "=r"(c));
+  __asm__ volatile("csrr %0, mcycle" : "=r"(c));
   return c;
 }
 
