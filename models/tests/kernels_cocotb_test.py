@@ -21,6 +21,7 @@ import os
 
 import cocotb
 import numpy as np
+from bazel_tools.tools.python.runfiles import runfiles
 
 from coralnpu_test_utils.sim_backends.verilator_test_fixture import VerilatorTestFixture
 from models.host import device as dev
@@ -54,7 +55,12 @@ class Harness:
     return np.frombuffer(bytes(np.asarray(raw, np.uint8)), dtype=dtype).reshape(shape)
 
   async def launch(self, name, **args):
-    path = os.path.join(KERNELS, name + ".elf")
+    # KERNEL_DIR selects the clang-18 ELFs from models/firmware/build.sh (the
+    # ones the F2 image runs) instead of the Bazel-built kernels.
+    if os.environ.get("KERNEL_DIR"):
+      path = os.path.join(os.environ["KERNEL_DIR"], name + ".elf")
+    else:
+      path = runfiles.Create().Rlocation(os.path.join(KERNELS, name + ".elf"))
     image = dev.KernelImage(path)
     await self.fx.load_elf_and_lookup_symbols(path, ["kargs", "_ret"])
     await self.fx.write(image.kargs, np.frombuffer(dev.pack_args(**args), np.uint8))
@@ -62,6 +68,7 @@ class Harness:
     status = (await self.get(image.kargs + dev.ARGS_SIZE - 8, np.uint32, (1,)))[0]
     ret = await self.fx.read_word("_ret")
     assert status == dev.STATUS_OK and ret == 0, f"{name}: status={status:#x} ret={ret:#x}"
+    return (await self.get(image.kargs + dev.ARGS_SIZE - 4, np.uint32, (1,)))[0]  # mcycle
 
 
 async def setup(dut):
@@ -91,7 +98,8 @@ async def test_quant_act(dut):
   x = rng.standard_normal((m, k)).astype(np.float32)
   xin = await h.put(pad16(x))
   xq, sx, xs = h.alloc(16 * k), h.alloc(16 * k // 32 * 4), h.alloc(16 * k // 32 * 4)
-  await h.launch("quant_act", m=m, k=k, in0=xin, out0=xq, out1=sx, in1=xs, u0=k)
+  xq1d = h.alloc(16 * k)
+  await h.launch("quant_act", m=m, k=k, in0=xin, out0=xq, out1=sx, in1=xs, in3=xq1d, u0=k)
   rq, rs, rsum = R.quant_act(x)
   np.testing.assert_array_equal((await h.get(xq, np.int8, (k, 16)))[:, :m].T, rq)
   np.testing.assert_allclose(await h.get(sx, np.float32, (m, k // 32)), rs, rtol=1e-6)
@@ -115,6 +123,26 @@ async def test_matvec_q4(dut):
                  u2=a_ws, out0=out, u0=n, u1=0)
   got = await h.get(out, np.float32, (m, n))
   np.testing.assert_allclose(got, R.matvec_q4(xq, sx, xsum8, nib, sc), rtol=1e-4, atol=1e-4)
+
+
+@cocotb.test()
+async def test_matvec_q4_decode(dut):
+  """m == 1 fast path (row-major activations in u3), as in decode."""
+  h = await setup(dut)
+  rng = np.random.default_rng(11)
+  k, n = 1152, 32
+  x = rng.standard_normal((1, k)).astype(np.float32)
+  w = rng.standard_normal((n, k)).astype(np.float32) * 0.1
+  nib, sc = W.quantize_q4_0(w)
+  tiles, scales = W.pack_tiles(nib, sc)
+  xq, sx, xsum8 = R.quant_act(x)
+  out = h.alloc(16 * n * 4)
+  await h.launch("matvec_q4", m=1, k=k, n=n, in0=await h.put(kmajor(xq)),
+                 in1=await h.put(pad16(sx)), in2=await h.put(pad16(xsum8)),
+                 in3=await h.put(tiles), u2=await h.put(scales), u3=await h.put(pad16(xq)),
+                 out0=out, u0=n, u1=0)
+  np.testing.assert_allclose(await h.get(out, np.float32, (1, n)),
+                             R.matvec_q4(xq, sx, xsum8, nib, sc), rtol=1e-4, atol=1e-4)
 
 
 @cocotb.test()
