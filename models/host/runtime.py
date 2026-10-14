@@ -90,7 +90,9 @@ class GemmaNative:
                 if backend.hbm else self.ddr)
     self.profile = {}
     self.trace = None  # optional callback(stage: str, layer: int | None)
-    self._load_weights(os.path.join(weights_dir, "weights.npz"))
+    self._weights_path = os.path.join(weights_dir, "weights.npz")
+    self.fused = None  # FusedDecoder when the assembly kernel is enabled
+    self._load_weights(self._weights_path)
     self._alloc_buffers()
     self._write_rope_tables()
     self.pos = 0
@@ -274,7 +276,10 @@ class GemmaNative:
       if next_tok in stop or self.pos >= self.S:
         break
       ts = time.perf_counter()
-      idx, val = self.step([next_tok])
+      if self.fused is not None:
+        idx, val = self.fused.step(next_tok)
+      else:
+        idx, val = self.step([next_tok])
       steps.append(dict(pos=self.pos - 1, input=next_tok, token=idx[0],
                         topk_idx=idx, topk_val=val,
                         seconds=time.perf_counter() - ts, tokens=1))

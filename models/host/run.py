@@ -74,6 +74,8 @@ def main():
   parser.add_argument("--cache-length", type=int, default=128)
   parser.add_argument("--out", default=None)
   parser.add_argument("--verbose", action="store_true")
+  parser.add_argument("--fused", default=None, metavar="ELF",
+                      help="use the fused assembly decode kernel (gemma_decode.elf)")
   args = parser.parse_args()
 
   with open(os.path.join(args.weights, "config.json")) as f:
@@ -101,6 +103,9 @@ def main():
     backend = dev.SimBackend(dev._run(mp.MpactNpuSimTestFixture.Create(highmem=False)))
   model = runtime.GemmaNative(backend, args.weights, args.kernels,
                               cache_length=args.cache_length, verbose=args.verbose)
+  if args.fused:
+    from models.host import fused  # pylint: disable=g-import-not-at-top
+    model.fused = fused.FusedDecoder(model, args.fused)
 
   results = []
   stop = () if args.ignore_eos else STOP
@@ -128,7 +133,7 @@ def main():
           f"({1 / r['decode_tokens_per_second']:.1f} s/token)  total {r['total_seconds']:.1f}s")
   if args.verbose:
     print(model.profile_report())
-  record = dict(model=cfg["model"], source="native", device=args.backend,
+  record = dict(model=cfg["model"], source="native-fused" if args.fused else "native", device=args.backend,
                 simulator=args.backend, act="int8", cache_length=args.cache_length,
                 results=results)
   if args.out:
