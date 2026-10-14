@@ -25,6 +25,10 @@ namespace coralnpu {
 // have registered themselves.
 bool SramBackdoorLoad(uint64_t global_addr, const uint8_t* data, size_t len);
 
+// Reads [global_addr, global_addr + len) from a registered SRAM. The range
+// must lie within a single SRAM. Returns false if no SRAM covers it.
+bool SramBackdoorRead(uint64_t global_addr, uint8_t* data, size_t len);
+
 }  // namespace coralnpu
 
 extern "C" {

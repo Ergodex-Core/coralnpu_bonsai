@@ -309,7 +309,11 @@ void CoreMiniAxi_tb::Connect() {
 absl::Status CoreMiniAxi_tb::LoadElfSync(const std::string& file_name) {
   CHECK_OK(LoadElfAsync(file_name));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -336,7 +340,10 @@ absl::Status CoreMiniAxi_tb::LoadElfAsync(const std::string& file_name) {
       bool in_tcm = (addr < itcm_size) || (addr >= dtcm_base && addr < dtcm_base + dtcm_size);
 
       bool use_backdoor = this->backdoor_load_;
-      if (use_backdoor && in_tcm) {
+      if (this->xbar_.Contains(addr, count)) {
+        // Testbench memory (EXTMEM/DDR): load directly, as a host would.
+        CHECK(this->xbar_.HostWrite(addr, reinterpret_cast<const uint8_t *>(src), count));
+      } else if (use_backdoor && in_tcm) {
         this->BackdoorLoad(addr, reinterpret_cast<const uint8_t *>(src), count);
       } else {
         elf_transfers.push_back(utils::Write(reinterpret_cast<uint64_t>(dest),
@@ -348,6 +355,20 @@ absl::Status CoreMiniAxi_tb::LoadElfAsync(const std::string& file_name) {
       }
       return dest;
     });
+    for (const auto &[name, value] : symbol_overrides_) {
+      uint64_t addr;
+      CHECK(::LookupSymbol(data8, name, &addr)) << "symbol not found: " << name;
+      symbol_override_storage_.push_back(value);
+      uint8_t *bytes = reinterpret_cast<uint8_t *>(&symbol_override_storage_.back());
+      if (xbar_.Contains(addr, sizeof(uint32_t))) {
+        CHECK(xbar_.HostWrite(addr, bytes, sizeof(uint32_t)));
+      } else {
+        elf_transfers.push_back(utils::Write(addr, bytes, sizeof(uint32_t)));
+        elf_transfers.push_back(utils::Read(addr, sizeof(uint32_t)));
+        elf_transfers.push_back(utils::Expect(bytes, sizeof(uint32_t)));
+      }
+    }
+    elf_data_.assign(data8, data8 + file_size);
     uint32_t entry_point_u32 = static_cast<uint32_t>(entry_point);
     elf_transfers.push_back(utils::Write(
         csr_addr_ + 0x4, reinterpret_cast<uint8_t *>(&entry_point_u32), sizeof(entry_point_u32)));
@@ -385,7 +406,11 @@ absl::Status CoreMiniAxi_tb::LoadElfAsync(const std::string& file_name) {
 absl::Status CoreMiniAxi_tb::ClockGateSync(bool enable) {
   CHECK_OK(ClockGateAsync(enable));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -404,7 +429,11 @@ absl::Status CoreMiniAxi_tb::ClockGateAsync(bool enable) {
 absl::Status CoreMiniAxi_tb::ResetSync(bool enable) {
   CHECK_OK(ResetAsync(enable));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -423,7 +452,11 @@ absl::Status CoreMiniAxi_tb::ResetAsync(bool enable) {
 absl::Status CoreMiniAxi_tb::CheckStatusSync() {
   CHECK_OK(CheckStatusAsync());
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -901,7 +934,11 @@ void CoreMiniAxi_tb::EnqueueTransactionSync(
     std::vector<DataTransfer> transfers) {
   EnqueueTransactionAsync(transfers);
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
 }
 
 void CoreMiniAxi_tb::EnqueueTransactionAsync(
@@ -925,6 +962,19 @@ void CoreMiniAxi_tb::axi_transaction_done_cb_(TLMTrafficGenerator* gen,
 }
 
 CoreMiniAxi_tb* CoreMiniAxi_tb::singleton_ = nullptr;
+
+absl::Status CoreMiniAxi_tb::ReadSymbol(const std::string& name, uint32_t* value) {
+  uint64_t addr;
+  if (elf_data_.empty() || !::LookupSymbol(elf_data_.data(), name, &addr)) {
+    return absl::NotFoundError("symbol not found: " + name);
+  }
+  uint8_t* out = reinterpret_cast<uint8_t*>(value);
+  if (xbar_.HostRead(addr, out, sizeof(*value)) ||
+      coralnpu::SramBackdoorRead(addr, out, sizeof(*value))) {
+    return absl::OkStatus();
+  }
+  return absl::OutOfRangeError("no memory backs symbol " + name);
+}
 
 void CoreMiniAxi_tb::BackdoorLoad(uint64_t addr, const uint8_t* data, size_t len) {
   CHECK(coralnpu::SramBackdoorLoad(addr, data, len));

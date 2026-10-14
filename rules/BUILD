@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag")
 load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -43,5 +43,22 @@ py_binary(
 bool_flag(
     name = "uvm_run_spike_cosim",
     build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# Verilator model threads for verilator_cc_library targets (--threads N).
+# 1 keeps the existing single-threaded models.
+int_flag(
+    name = "verilator_threads",
+    build_setting_default = 1,
+    visibility = ["//visibility:public"],
+)
+
+# Keep RTL assertions in ArcSim models (matches Verilator). Set
+# --//rules:arcsim_assertions=false to build with --ignore-assertions and
+# -DSYNTHESIS, the configuration the ArcSim benchmark bundles were validated in.
+bool_flag(
+    name = "arcsim_assertions",
+    build_setting_default = True,
     visibility = ["//visibility:public"],
 )
