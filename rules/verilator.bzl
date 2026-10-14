@@ -326,6 +326,11 @@ def _verilator_cc_library_impl(ctx):
     if ctx.attr.trace:
         verilator_flags.append("--trace-fst")
 
+    # Multithreaded model evaluation (--//rules:verilator_threads=N).
+    threads = ctx.attr._threads[BuildSettingInfo].value
+    if threads > 1:
+        verilator_flags.extend(["--threads", str(threads)])
+
     for opt in ctx.attr.vopts:
         verilator_flags.append(opt)
 
@@ -467,6 +472,10 @@ verilator_cc_library = rule(
         ),
         "_libverilator": attr.label(
             default = "@verilator//:libverilator",
+        ),
+        "_threads": attr.label(
+            default = Label("//rules:verilator_threads"),
+            providers = [BuildSettingInfo],
         ),
         "_zlib": attr.label(
             default = "@net_zlib//:zlib",
