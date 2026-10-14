@@ -111,6 +111,37 @@ Those folders are not in S3. They are probably only inside the tarball.
 | `i-0adbe40acf807ef24` | `chipyard` | `ami-07c5616000d1cd98b` | stopped |
 | `i-0e6d0af4becf6fbd1` | `umang-dev-fpga` | `ami-0521cb2d60cfbb1a6` | stopped |
 
+## Running models on this image (branch `fpga-workflow`)
+
+Software added for this image, all under the `fpga-workflow` branch:
+
+| Piece | Where | Purpose |
+|---|---|---|
+| `fpga_run.sh` | repo root | One entry point: preflight the slot, then run an ELF, a `.vmfb`/`.mlir`/`.tflite`, or a Gemma export |
+| F2 host library | `fpga/aws/f2/` | `f2_device.py` (BAR0 TCM/CSR, BAR4 DDR/HBM, reset/start/halt) and `run_elf.py` |
+| F2 compiler backend | `third_party/coralnpu-compiler/runtime/sim/f2/` | `--simulator=f2`: runs IREE dispatches over PCIe; `CORALNPU_PERSISTENT_DEVICE_MEMORY=1` keeps weights resident in DDR |
+| Zvt feature gating | compiler `CoralNPUTileSizeSelectionUtils.cpp` + IREE patch 0006 | bf16 / int8 / f32 matrix modes each require their own target feature. Use `+m,+f,+zvl128b,+zve32f,+zvtbase,+zvt8e,+zvti8i32mm,+zvtf32f32mm` for this image |
+| Gemma export | compiler `examples/gemma3-jax-aot/{gemma_f2,export_gemma_f2,chat_f2}.py` | Gemma3-1B from `gaunernst/gemma-3-1b-it-int4-gguf` (llama.cpp Q4_0: int4 codes in groups of 32 kept exactly, f16 scales); 270M/FunctionGemma from bf16 safetensors quantized here to per-channel int4. int8 activations (per group for Q4_0), f32 residual/KV cache, no bf16 |
+| Tools | `tools/mlx_reference.py`, `tools/compare_tokens.py`, `tools/estimate_tps.py` | MLX quality reference on a Mac, record comparison, 1 GHz tokens/s estimate from MPACT cycles |
+
+Facts about the image that drove the design (from the frozen RTL in S3):
+- Zvt matrix unit: `ZVTI16I32MM_ON` and `ZVTBF16FMM_ON` are not defined, so only int8 and f32 matrix modes exist. Vector bf16 and Zfbfmin are off.
+- Core memory windows: `0x80000000` DDR (1 GiB), `0xC0000000` HBM (1 GiB, crossbar `0x10_0000_0000`). No SRAM at `0x20000000`.
+- Core clock 25 MHz. Best case about 1 tok/s for Gemma3-1B int4 and 6 to 8 tok/s for 270M.
+
+Typical session on the F2 host:
+
+```bash
+source aws-fpga/sdk_setup.sh
+export HF_TOKEN=...   # functiongemma-270m-it is gated; the Gemma3-1B GGUF is public
+./fpga_run.sh --load bazel-bin/path/to/hello.elf
+./fpga_run.sh --backend mpact --profile-log prof.log functiongemma-270m   # golden + 1 GHz estimate
+./fpga_run.sh --reference artifacts/functiongemma-270m/run_mpact.json functiongemma-270m
+./fpga_run.sh gemma3-1b --prompt "France capital is" --max-tokens 16
+```
+
+On the Mac: `pip install mlx-lm && tools/mlx_reference.py --model mlx-community/gemma-3-1b-it-qat-bf16 --prompt "France capital is" --out ref.json`, then pass `--reference ref.json`.
+
 ## Useful commands
 
 ```bash
