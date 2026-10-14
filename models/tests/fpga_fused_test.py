@@ -98,7 +98,7 @@ def t_quant_matvec(h):
   np.testing.assert_array_equal(h.get(xs_out, np.float32, (k // 32,)), xsum8[0])
   out = h.alloc(n * 4)
   cyc = h.run(3, test_a=h.put(tiles), test_b=h.put(F.scales_to_f16(scales)), test_c=out,
-              test_n=k, test_k=n)
+              test_d=h.put(x), test_n=k, test_k=n)
   got = h.get(out, np.float32, (n,))
   sc16 = scales.astype(np.float16).astype(np.float32)
   ref = R.matvec_q4(xq, sx, xsum8, nib, sc16.transpose(0, 2, 1).reshape(n, k // 32))[0]

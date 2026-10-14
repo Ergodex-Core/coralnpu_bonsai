@@ -82,6 +82,9 @@
 #define VTZERO0   ZVT_WORD(0x10, 30, 0, 6, 0, 0x57)    // vtzero mt0
 #define VTMMS0    ZVT_WORD(0x3C, 8, 16, 0, 1, 0x77)    // vtmms.tvv mt0, v8.., v16.. (signed A)
 #define VTMV_V_T  ZVT_WORD(0x10, 31, 10, 6, 4, 0x57)   // vtmv.v.t v4.., a0 (tss)
+#define VTMV_V24_T ZVT_WORD(0x10, 31, 10, 6, 24, 0x57) // vtmv.v.t v24, a0 (tss)
+#define VTMV_V25_T ZVT_WORD(0x10, 31, 10, 6, 25, 0x57) // vtmv.v.t v25, a0 (tss)
+#define TSS_T4_ROW0 (4 << 27)                          // tile 4, row 0
 
     .text
     .globl main
@@ -489,28 +492,33 @@ matvec:
     li   t5, MTYPE_INT8
     li   t6, VTYPE_E8M1
     .insn r 0x57, 7, 0x41, x0, t5, t6     // msetmtype
-    li   t5, 1
-    .insn r 0x57, 7, 0x42, t6, t5, x1     // msettm 1
     li   t5, 16
+    .insn r 0x57, 7, 0x42, t6, t5, x1     // msettm 16 (rows beyond 0 are harmless)
     .insn r 0x57, 7, 0x42, t6, t5, x0     // msettn 16 (vl=16)
     .word VTZERO0
+    // The group's 256 B of nibbles arrive in one tile load (tile 4, 16 rows
+    // of 16 B); rows are moved to vector registers instead of bus loads.
+    li   t4, TSS_T4_ROW0
+    .insn r 0x07, 7, 0x09, zero, s5, t4   // vtle8 tile4, (s5)
+    addi s5, s5, 256
+    li   a0, TSS_T4_ROW0                  // row cursor for the moves
     li   t6, 2
-2:  vle8.v v26, (s9)                      // 16 k of activations
+2:  vle8.v v26, (s9)                      // 16 k of activations (DTCM)
     li   t5, 4
 1:  vmv.v.v v8, v26
     vslidedown.vi v10, v26, 1
     vslidedown.vi v12, v26, 2
     vslidedown.vi v14, v26, 3
-    vle8.v v24, (s5)
-    addi t4, s5, 16
-    vle8.v v25, (t4)
+    .word VTMV_V24_T                      // v24 <- tile4 row 2j (lo|hi nibbles of k0,k0+1)
+    addi a0, a0, 1
+    .word VTMV_V25_T                      // v25 <- tile4 row 2j+1 (k0+2,k0+3)
+    addi a0, a0, 1
     vand.vi v16, v24, 15
     vsrl.vi v18, v24, 4
     vand.vi v20, v25, 15
     vsrl.vi v22, v25, 4
     .word VTMMS0
     vslidedown.vi v26, v26, 4
-    addi s5, s5, 32
     addi t5, t5, -1
     bnez t5, 1b
     addi s9, s9, 16
@@ -573,7 +581,9 @@ matvec:
     addi s7, s7, 64
     j    4f
 3:  slli a0, s8, 4                        // base index = tile*16
+    sw   a7, 8(sp)
     jal  ra, topk_tile
+    lw   a7, 8(sp)
 4:  addi s8, s8, 1
     bne  s8, s4, .Lmv_tile
     lw   ra, 12(sp)
@@ -979,9 +989,11 @@ topk_tile:
     slli a6, t6, 2
     add  a6, t2, a6
     fsw  ft3, 0(a6)            // val[j] = val[j-1]
-    add  a5, t1, a5
+    slli a5, a7, 2
+    add  a5, t1, a5            // &idx[j-1]
     lw   a7, 0(a5)
-    add  a6, t1, a6
+    slli a6, t6, 2
+    add  a6, t1, a6            // &idx[j]
     sw   a7, 0(a6)             // idx[j] = idx[j-1]
     addi t6, t6, -1
     j    2b
@@ -1000,8 +1012,7 @@ topk_tile:
 // Routine tests (op 1..8): operands from dargs.test_* (offsets 188..216).
 //   1 rmsnorm:   a=x b=scale c=out n=len d=residual(0)
 //   2 quant:     a=x n=k; outputs copied: c=xq1d(out, n bytes) d=sx e=xsum8
-//   3 matvec:    a=tiles b=scales(f16) c=out n=K k=N; activations from a
-//                prior op 2 run (host runs op 2 then op 3)
+//   3 matvec:    a=tiles b=scales(f16) c=out n=K k=N d=x f32 (quantized first)
 //   4 rope:      a=x b=cos c=sin n=hd
 //   5 attention: a=q b=kcache c=vcache d=out n=pos k=window
 //   6 gelu:      a=gate_up c=out n=H
@@ -1040,12 +1051,20 @@ test_quant:
     addi sp, sp, 16
     ret
 test_matvec:
+    addi sp, sp, -16
+    sw   ra, 12(sp)
+    lw   a0, 200(s0)           // x f32 (test_d)
+    lw   a1, 208(s0)           // K
+    jal  ra, quant_act
     lw   a0, 188(s0)
     lw   a1, 192(s0)
     lw   a2, 196(s0)
     lw   a3, 208(s0)
     lw   a4, 212(s0)
-    j    matvec
+    jal  ra, matvec
+    lw   ra, 12(sp)
+    addi sp, sp, 16
+    ret
 test_rope:
     lw   a0, 188(s0)
     lw   a1, 192(s0)

@@ -62,6 +62,10 @@ static inline __attribute__((always_inline)) void zvt_msettm(uint32_t tm) {
 #define ZVT_VTMMS(tile) ZVT_WORD(0x3C, 8, 16, 0, ((tile) << 1) | 1, ZVT_OP_VE)
 #define ZVT_VTZERO(tile) ZVT_WORD(0x10, 30, 0, 6, (tile) << 1, ZVT_OP_V)
 #define ZVT_VTMV_V_T ZVT_WORD(0x10, 31, 10, 6, 4, ZVT_OP_V)  // v4..v7 <- tile row (tss in a0)
+// Same move into an arbitrary destination register (e8: one 16-byte row).
+#define ZVT_VTMV_V_T_RD(rd) ZVT_WORD(0x10, 31, 10, 6, (rd), ZVT_OP_V)
+// Tile load (vtle8): .insn r 0x07, 7, 0x09, zero, rs1(addr), rs2(tss) loads
+// 16 rows of 16 bytes from a contiguous 256-byte block (one bus burst).
 #define ZVT_VTMV_T_V ZVT_WORD(0x17, 4, 10, 6, 0, ZVT_OP_V)   // tile row <- v4..v7
 
 #define ZVT_TSS(tile, row) (((tile) << 27) | (row))

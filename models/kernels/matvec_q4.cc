@@ -49,35 +49,55 @@ static inline __attribute__((always_inline)) void group_matmul(
       "li t5, 16\n\t"
       MSETTN
       ".word %[vtzero]\n\t"
+      // Weights: the group's 256 B arrive in one tile load (tile 4). The
+      // activations' 32 k x 16 tokens (512 B, k-major) arrive in two tile
+      // loads (tiles 8 and 12). Rows are then moved to vector registers.
+      "li t4, %[tss4]\n\t"
+      ".insn r 0x07, 7, 0x09, zero, %[w], t4\n\t"      // vtle8 tile4
+      "li t4, %[tss8]\n\t"
+      ".insn r 0x07, 7, 0x09, zero, %[xq], t4\n\t"     // vtle8 tile8 (k0..k0+15)
+      "addi t4, %[xq], 256\n\t"
+      "li t5, %[tss12]\n\t"
+      ".insn r 0x07, 7, 0x09, zero, t4, t5\n\t"        // vtle8 tile12 (k0+16..k0+31)
       "li t6, 8\n\t"
+      "li a0, %[tss8]\n\t"                              // A row cursor
+      "li t5, %[tss4]\n\t"                              // B row cursor (in t5)
       "1:\n\t"
-      // A rows j: xqT[k0 + j][0..15], 16 contiguous bytes each (k-major
-      // layout written by quant_act), one bus transaction per row.
-      "vle8.v v8, (%[xq])\n\t"
-      "addi t4, %[xq], 16\n\t"
-      "vle8.v v10, (t4)\n\t"
-      "addi t4, %[xq], 32\n\t"
-      "vle8.v v12, (t4)\n\t"
-      "addi t4, %[xq], 48\n\t"
-      "vle8.v v14, (t4)\n\t"
-      // B rows: 32 packed bytes -> 4 nibble rows (unsigned 0..15).
-      "vle8.v v24, (%[w])\n\t"
-      "addi t4, %[w], 16\n\t"
-      "vle8.v v25, (t4)\n\t"
+      ".word %[mv8]\n\t"                                // v8  <- A row k0+4j
+      "addi a0, a0, 1\n\t"
+      ".word %[mv10]\n\t"
+      "addi a0, a0, 1\n\t"
+      ".word %[mv12]\n\t"
+      "addi a0, a0, 1\n\t"
+      ".word %[mv14]\n\t"
+      "addi a0, a0, 1\n\t"
+      "li t4, 4\n\t"
+      "bne t6, t4, 2f\n\t"
+      "li a0, %[tss12]\n\t"                             // second half of the group
+      "2:\n\t"
+      "mv t4, a0\n\t"
+      "mv a0, t5\n\t"
+      ".word %[mv24]\n\t"                               // v24 <- B row 2j
+      "addi a0, a0, 1\n\t"
+      ".word %[mv25]\n\t"                               // v25 <- B row 2j+1
+      "addi t5, a0, 1\n\t"
+      "mv a0, t4\n\t"
       "vand.vi v16, v24, 15\n\t"
       "vsrl.vi v18, v24, 4\n\t"
       "vand.vi v20, v25, 15\n\t"
       "vsrl.vi v22, v25, 4\n\t"
       ".word %[vtmms]\n\t"
-      "addi %[xq], %[xq], 64\n\t"
-      "addi %[w], %[w], 32\n\t"
       "addi t6, t6, -1\n\t"
       "bnez t6, 1b\n\t"
       : [xq] "+r"(xq), [w] "+r"(w)
       : [tm] "r"(tm),
         [mtype] "i"(zvt_mtype(ZVT_TE, 4, 3)), [vtype] "i"(ZVT_VTYPE_SEW8_LMUL1),
-        [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0))
-      : "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
+        [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0)),
+        [tss4] "i"(ZVT_TSS(4, 0)), [tss8] "i"(ZVT_TSS(8, 0)), [tss12] "i"(ZVT_TSS(12, 0)),
+        [mv8] "i"(ZVT_VTMV_V_T_RD(8)), [mv10] "i"(ZVT_VTMV_V_T_RD(10)),
+        [mv12] "i"(ZVT_VTMV_V_T_RD(12)), [mv14] "i"(ZVT_VTMV_V_T_RD(14)),
+        [mv24] "i"(ZVT_VTMV_V_T_RD(24)), [mv25] "i"(ZVT_VTMV_V_T_RD(25))
+      : "a0", "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
         "v20", "v22", "v24", "v25");
 }
 
@@ -95,6 +115,10 @@ static inline __attribute__((always_inline)) void group_matmul_1d(
       "li t5, 16\n\t"
       MSETTN
       ".word %[vtzero]\n\t"
+      "li t4, %[tss4]\n\t"
+      ".insn r 0x07, 7, 0x09, zero, %[w], t4\n\t"      // vtle8 tile4: 256 B of nibbles
+      "addi %[w], %[w], 256\n\t"
+      "li a0, %[tss4]\n\t"                              // B row cursor
       "li t6, 2\n\t"
       "2:\n\t"
       "vle8.v v26, (%[xq])\n\t"          // 16 bytes: k0 .. k0+15 (16 k)
@@ -104,16 +128,16 @@ static inline __attribute__((always_inline)) void group_matmul_1d(
       "vslidedown.vi v10, v26, 1\n\t"     // row 1: lane 0 = xq[k+1]
       "vslidedown.vi v12, v26, 2\n\t"
       "vslidedown.vi v14, v26, 3\n\t"
-      "vle8.v v24, (%[w])\n\t"
-      "addi t4, %[w], 16\n\t"
-      "vle8.v v25, (t4)\n\t"
+      ".word %[mv24]\n\t"                 // v24 <- tile4 row 2j
+      "addi a0, a0, 1\n\t"
+      ".word %[mv25]\n\t"                 // v25 <- tile4 row 2j+1
+      "addi a0, a0, 1\n\t"
       "vand.vi v16, v24, 15\n\t"
       "vsrl.vi v18, v24, 4\n\t"
       "vand.vi v20, v25, 15\n\t"
       "vsrl.vi v22, v25, 4\n\t"
       ".word %[vtmms]\n\t"
       "vslidedown.vi v26, v26, 4\n\t"     // next 4 k
-      "addi %[w], %[w], 32\n\t"
       "addi t5, t5, -1\n\t"
       "bnez t5, 1b\n\t"
       "addi %[xq], %[xq], 16\n\t"
@@ -121,8 +145,10 @@ static inline __attribute__((always_inline)) void group_matmul_1d(
       "bnez t6, 2b\n\t"
       : [xq] "+r"(xq1d), [w] "+r"(w)
       : [mtype] "i"(zvt_mtype(ZVT_TE, 4, 3)), [vtype] "i"(ZVT_VTYPE_SEW8_LMUL1),
-        [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0))
-      : "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
+        [vtzero] "i"(ZVT_VTZERO(0)), [vtmms] "i"(ZVT_VTMMS(0)),
+        [tss4] "i"(ZVT_TSS(4, 0)), [mv24] "i"(ZVT_VTMV_V_T_RD(24)),
+        [mv25] "i"(ZVT_VTMV_V_T_RD(25))
+      : "a0", "t4", "t5", "t6", "memory", "v8", "v10", "v12", "v14", "v16", "v18",
         "v20", "v22", "v24", "v25", "v26");
 }
 
