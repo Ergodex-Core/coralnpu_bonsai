@@ -21,6 +21,8 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -29,6 +31,7 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "tests/verilator_sim/coralnpu/core_mini_axi_tb.h"
+#include "tests/verilator_sim/symbol_args.h"
 #include "tests/verilator_sim/sysc_tb.h"
 
 /* clang-format off */
@@ -41,10 +44,18 @@ ABSL_FLAG(std::string, binary, "", "Binary to execute");
 ABSL_FLAG(bool, debug_axi, false, "Enable AXI traffic debugging");
 ABSL_FLAG(bool, instr_trace, false, "Log instructions to console");
 ABSL_FLAG(bool, backdoor_load, false, "Enable high-speed backdoor code loading");
+ABSL_FLAG(std::vector<std::string>, set, {},
+          "Comma-separated symbol=value 32-bit writes applied after the ELF "
+          "is loaded, e.g. active_m=1,active_epsilon=f32:1e-6");
+ABSL_FLAG(std::vector<std::string>, dump, {},
+          "Comma-separated symbols whose 32-bit values are printed after the "
+          "run as 'SYMBOL name=value'");
 
 static bool run(const char* name, const std::string binary, const int cycles,
                 const bool trace, const bool debug_axi, const bool instr_trace,
-                const bool backdoor_load) {
+                const bool backdoor_load,
+                std::vector<std::pair<std::string, uint32_t>> overrides,
+                const std::vector<std::string>& dumps) {
   const auto began = std::chrono::steady_clock::now();
   absl::Mutex halted_mtx;
   absl::CondVar halted_cv;
@@ -64,6 +75,7 @@ static bool run(const char* name, const std::string binary, const int cycles,
     tb.trace(tb.core());
   }
 
+  tb.SetSymbolOverrides(std::move(overrides));
   std::thread sc_main_thread([&tb]() { tb.start(); });
 
   CHECK_OK(tb.LoadElfSync(binary));
@@ -77,6 +89,18 @@ static bool run(const char* name, const std::string binary, const int cycles,
 
   if (!tb.io_fault && !tb.tohost_halt) {
     CHECK_OK(tb.CheckStatusSync());
+  }
+
+  // Read before sc_stop(): the SRAM backdoor registry is torn down when the
+  // model's final blocks run.
+  for (const auto& name : dumps) {
+    uint32_t value = 0;
+    const absl::Status status = tb.ReadSymbol(name, &value);
+    if (status.ok()) {
+      printf("SYMBOL %s=%u\n", name.c_str(), value);
+    } else {
+      LOG(ERROR) << status;
+    }
   }
 
   sc_stop();
@@ -112,8 +136,19 @@ extern "C" int sc_main(int argc, char** argv) {
     return -1;
   }
 
+  std::vector<std::pair<std::string, uint32_t>> overrides;
+  for (const auto& arg : absl::GetFlag(FLAGS_set)) {
+    auto parsed = coralnpu_sim::ParseSymbolAssignment(arg);
+    if (!parsed) {
+      LOG(ERROR) << "bad --set entry (want symbol=value): " << arg;
+      return -1;
+    }
+    overrides.push_back(*parsed);
+  }
+
   return run(Sysc_tb::get_name(argv[0]), absl::GetFlag(FLAGS_binary),
       absl::GetFlag(FLAGS_cycles), absl::GetFlag(FLAGS_trace),
       absl::GetFlag(FLAGS_debug_axi), absl::GetFlag(FLAGS_instr_trace),
-      absl::GetFlag(FLAGS_backdoor_load)) ? 0 : 1;
+      absl::GetFlag(FLAGS_backdoor_load), std::move(overrides),
+      absl::GetFlag(FLAGS_dump)) ? 0 : 1;
 }

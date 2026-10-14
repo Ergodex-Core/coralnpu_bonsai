@@ -49,10 +49,24 @@ _RVV_HDRS = [
     "//hdl/verilog/rvv/inc:rvv_backend_sva.svh",
 ]
 
+# core -> (top module, Verilator vopts, RTL include headers, harness defines).
+# Highmem cores (1 MiB ITCM/DTCM, CSR at 0x200000) run the Gemma kernels.
 _CORES = {
-    "core_mini_axi": ("CoreMiniAxi", CORE_MINI_AXI_VOPTS, []),
-    "rvv_core_mini_axi": ("RvvCoreMiniAxi", RVV_CORE_MINI_AXI_VOPTS, _RVV_HDRS),
-    "vme_core_mini_axi": ("VmeCoreMiniAxi", VME_CORE_MINI_AXI_VOPTS, _RVV_HDRS),
+    "core_mini_axi": ("CoreMiniAxi", CORE_MINI_AXI_VOPTS, [], []),
+    "rvv_core_mini_axi": ("RvvCoreMiniAxi", RVV_CORE_MINI_AXI_VOPTS, _RVV_HDRS, []),
+    "rvv_core_mini_highmem_axi": (
+        "RvvCoreMiniHighmemAxi",
+        RVV_CORE_MINI_AXI_VOPTS,
+        _RVV_HDRS,
+        ["HIGHMEM_RTL"],
+    ),
+    "vme_core_mini_axi": ("VmeCoreMiniAxi", VME_CORE_MINI_AXI_VOPTS, _RVV_HDRS, []),
+    "vme_core_mini_highmem_axi": (
+        "VmeCoreMiniHighmemAxi",
+        VME_CORE_MINI_AXI_VOPTS,
+        _RVV_HDRS,
+        ["HIGHMEM_RTL"],
+    ),
 }
 
 [
@@ -65,15 +79,16 @@ _CORES = {
         ),
         top = top,
     )
-    for core, (top, vopts, hdrs) in _CORES.items()
+    for core, (top, vopts, hdrs, _) in _CORES.items()
 ]
 
 [
     arcsim_sim_binary(
         name = core + "_sim",
+        defines = defines,
         model = ":{}_model".format(core),
     )
-    for core in _CORES
+    for core, (_, _, _, defines) in _CORES.items()
 ]
 
 # Runs the same ELFs on ArcSim and Verilator and requires the same pass/fail

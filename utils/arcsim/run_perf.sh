@@ -41,11 +41,13 @@ missing=()
 for tool in clang clang++ java unzip git python3 nm taskset; do
   command -v "${tool}" >/dev/null || missing+=("${tool}")
 done
+# Verilator's FST tracing needs lz4 headers.
+[[ -f /usr/include/lz4.h ]] || missing+=("liblz4-dev")
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "Missing tools: ${missing[*]}" >&2
   echo "Install them with (Ubuntu 24.04):" >&2
   echo "  sudo apt-get install -y clang-19 lld-19 openjdk-21-jdk-headless unzip zip libelf-dev srecord xxd \\" >&2
-  echo "    libzstd-dev zlib1g-dev libncurses-dev && sudo ln -sf /usr/bin/clang-19 /usr/local/bin/clang \\" >&2
+  echo "    libzstd-dev zlib1g-dev libncurses-dev liblz4-dev && sudo ln -sf /usr/bin/clang-19 /usr/local/bin/clang \\" >&2
   echo "    && sudo ln -sf /usr/bin/clang++-19 /usr/local/bin/clang++" >&2
   exit 1
 fi
@@ -69,7 +71,13 @@ for core in ${cores}; do perf_targets+=("//tests/arcsim_sim:${core}_perf"); done
 
 # Build timing is part of the comparison: ArcSim model compile vs Verilator.
 start=$(date +%s)
-"${bazel}" build --config=arcsim --noshow_progress "${perf_targets[@]}" 2>&1 | tail -20
+if ! "${bazel}" build --config=arcsim --noshow_progress "${perf_targets[@]}" >"${out}/build.log" 2>&1; then
+  # Show the first diagnostics, not just the tail: MLIR errors are followed by
+  # long note chains.
+  grep -m 10 -B 2 -A 6 -E "error:|ERROR:" "${out}/build.log" >&2 || tail -40 "${out}/build.log" >&2
+  echo "Build failed; full log: ${out}/build.log" >&2
+  exit 1
+fi
 echo "Build (both simulators, all inputs): $(( $(date +%s) - start ))s" | tee -a "${out}/README.md"
 
 cpu_args=()

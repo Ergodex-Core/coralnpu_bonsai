@@ -88,6 +88,18 @@ bool SramBackdoorLoad(uint64_t global_addr, const uint8_t *data, size_t len) {
   return load_ok;
 }
 
+bool SramBackdoorRead(uint64_t global_addr, uint8_t *data, size_t len) {
+  for (const auto &[base, sram] : registered_srams) {
+    const uint64_t sram_end = sram->global_addr + sram->data.size();
+    if (global_addr >= sram->global_addr && global_addr + len <= sram_end) {
+      std::memcpy(data, sram->data.data() + (global_addr - sram->global_addr),
+                  len);
+      return true;
+    }
+  }
+  return false;
+}
+
 template <typename Ehdr, typename Phdr>
 bool LoadElfSegmentsTyped(FILE *f, const char *filename) {
   Ehdr ehdr;

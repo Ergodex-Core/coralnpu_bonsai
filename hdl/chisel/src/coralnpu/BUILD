@@ -894,7 +894,9 @@ filter_files_by_extension(
     for core in [
         "core_mini_axi",
         "rvv_core_mini_axi",
+        "rvv_core_mini_highmem_axi",
         "vme_core_mini_axi",
+        "vme_core_mini_highmem_axi",
     ]
 ]
 

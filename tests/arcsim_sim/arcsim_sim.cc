@@ -24,8 +24,12 @@
 //     back for verification; the entry point goes to CSR+0x4, then the clock
 //     gate and reset are released through the CSR.
 //   * The AXI master port is served by a 4 MiB memory at 0x20000000
-//     (initialised to 0xa5) and a line-buffered UART at 0x54000000, like
-//     tests/systemc/Xbar.h. Other addresses answer DECERR.
+//     (initialised to 0xa5), a line-buffered UART at 0x54000000 and a sparse
+//     2 GiB DDR at 0x80000000, like tests/systemc/Xbar.h. Other addresses
+//     answer DECERR. ELF segments in these memories are loaded directly.
+//   * --set=symbol=value writes 32-bit values to ELF symbols before the core
+//     starts and --dump=symbol prints them after the run ("SYMBOL name=v"),
+//     e.g. to set kernel shapes and read back an mcycle-based cycle_count.
 //   * HTIF tohost/fromhost semihosting is handled when the core exposes its
 //     debug dbus ports (io_debug_dbus_*).
 //   * The run ends on io_halted, io_fault or a tohost exit. Exit status is 0
@@ -47,11 +51,13 @@
 #include <cstring>
 #include <deque>
 #include <iostream>
+#include <memory>
 #include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "absl/flags/flag.h"
@@ -62,6 +68,7 @@
 #include "absl/log/log.h"
 #include "arcsim_model.h"
 #include "tests/verilator_sim/elf.h"
+#include "tests/verilator_sim/symbol_args.h"
 
 ABSL_FLAG(int, cycles, 100000000, "Simulation cycles");
 ABSL_FLAG(bool, trace, false, "Waveform tracing (not supported by ArcSim)");
@@ -72,6 +79,15 @@ ABSL_FLAG(bool, instr_trace, false,
 ABSL_FLAG(bool, backdoor_load, false,
           "High-speed backdoor code loading (not supported by ArcSim; the "
           "ELF is loaded over AXI)");
+ABSL_FLAG(bool, verify_load, true,
+          "Read back ELF segments loaded over AXI and compare (as the "
+          "Verilator testbench does). Disable to halve load time.");
+ABSL_FLAG(std::vector<std::string>, set, {},
+          "Comma-separated symbol=value 32-bit writes applied after the ELF "
+          "is loaded, e.g. active_m=1,active_epsilon=f32:1e-6");
+ABSL_FLAG(std::vector<std::string>, dump, {},
+          "Comma-separated symbols whose 32-bit values are printed after the "
+          "run as 'SYMBOL name=value'");
 
 // Runtime entry points. Which ones exist depends on the ArcSim build; the
 // @arcsim repository probes the runtime archives and defines ARCSIM_HAS_*.
@@ -103,6 +119,9 @@ constexpr uint32_t kCsrAddr = 0x30000;
 constexpr uint32_t kMemoryAddr = 0x20000000;
 constexpr uint32_t kMemorySizeBytes = 0x400000;
 constexpr uint32_t kUartAddr = 0x54000000;
+constexpr uint64_t kDdrAddr = 0x80000000;
+constexpr uint64_t kDdrSizeBytes = 0x80000000;
+constexpr uint64_t kDdrPageBytes = 0x10000;
 constexpr uint64_t kHalfPeriodFs = 500000;  // 1 ns clock, as in Sysc_tb.
 constexpr uint8_t kRespOkay = 0;
 constexpr uint8_t kRespDecErr = 3;
@@ -339,9 +358,33 @@ class ArcsimTb {
   // else goes through the core's AXI slave (as CoreMiniAxi_tb does).
   bool WriteMem(uint64_t addr, const uint8_t* data, size_t len);
   bool ReadMem(uint64_t addr, uint8_t* data, size_t len);
-  bool InHostMemory(uint64_t addr, size_t len) const {
+  static bool InExtmem(uint64_t addr, size_t len) {
     return addr >= kMemoryAddr && addr + len <= uint64_t(kMemoryAddr) + kMemorySizeBytes;
   }
+  static bool InDdr(uint64_t addr, size_t len) {
+    return addr >= kDdrAddr && addr + len <= kDdrAddr + kDdrSizeBytes;
+  }
+  static bool InHostMemory(uint64_t addr, size_t len) {
+    return InExtmem(addr, len) || InDdr(addr, len);
+  }
+  uint8_t* HostByte(uint64_t addr) {
+    if (addr >= kDdrAddr) {
+      auto& page = ddr_pages_[(addr - kDdrAddr) / kDdrPageBytes];
+      if (!page) {
+        page.reset(new uint8_t[kDdrPageBytes]);
+        std::memset(page.get(), 0xa5, kDdrPageBytes);
+      }
+      return &page[(addr - kDdrAddr) % kDdrPageBytes];
+    }
+    return &memory_[addr - kMemoryAddr];
+  }
+
+ public:
+  // --set / --dump support. Valid after LoadElf().
+  bool WriteSymbol(const std::string& name, uint32_t value);
+  bool ReadSymbol(const std::string& name, uint32_t* value);
+
+ private:
 
   void ServiceTohost(uint64_t addr);
   int64_t Syscall(const uint64_t words[8]);
@@ -363,6 +406,8 @@ class ArcsimTb {
 
   // AXI master target (testbench memory/UART).
   std::vector<uint8_t> memory_;
+  std::unordered_map<uint64_t, std::unique_ptr<uint8_t[]>> ddr_pages_;
+  std::vector<uint8_t> elf_data_;
   std::string uart_line_;
   bool rd_busy_ = false, wr_busy_ = false;
   uint32_t rd_addr_ = 0, wr_addr_ = 0, rd_left_ = 0, wr_left_ = 0;
@@ -454,7 +499,9 @@ void ArcsimTb::ServeMaster() {
     U128 data = 0;
     uint8_t resp = kRespOkay;
     if (InHostMemory(base, bus_bytes_)) {
-      std::memcpy(&data, &memory_[base - kMemoryAddr], bus_bytes_);
+      for (uint32_t i = 0; i < bus_bytes_; ++i) {
+        data |= U128(*HostByte(base + i)) << (8 * i);
+      }
     } else {
       resp = kRespDecErr;
     }
@@ -499,7 +546,7 @@ void ArcsimTb::ServeMaster() {
       const uint8_t byte = static_cast<uint8_t>(data >> (8 * i));
       const uint32_t addr = base + i;
       if (InHostMemory(addr, 1)) {
-        memory_[addr - kMemoryAddr] = byte;
+        *HostByte(addr) = byte;
       } else if (base == kUartAddr) {
         UartByte(byte);
       } else {
@@ -652,7 +699,7 @@ bool ArcsimTb::Read32(uint32_t addr, uint32_t* value) {
 
 bool ArcsimTb::WriteMem(uint64_t addr, const uint8_t* data, size_t len) {
   if (InHostMemory(addr, len)) {
-    std::memcpy(&memory_[addr - kMemoryAddr], data, len);
+    for (size_t i = 0; i < len; ++i) *HostByte(addr + i) = data[i];
     return true;
   }
   uint8_t size = 0;
@@ -678,7 +725,7 @@ bool ArcsimTb::WriteMem(uint64_t addr, const uint8_t* data, size_t len) {
 
 bool ArcsimTb::ReadMem(uint64_t addr, uint8_t* data, size_t len) {
   if (InHostMemory(addr, len)) {
-    std::memcpy(data, &memory_[addr - kMemoryAddr], len);
+    for (size_t i = 0; i < len; ++i) data[i] = *HostByte(addr + i);
     return true;
   }
   uint8_t size = 0;
@@ -720,10 +767,12 @@ bool ArcsimTb::LoadElf(const std::string& path) {
         data8, [this, &ok](void* dest, const void* src, size_t count) {
           const uint64_t addr = reinterpret_cast<uint64_t>(dest);
           const uint8_t* bytes = static_cast<const uint8_t*>(src);
-          std::vector<uint8_t> check(count);
+          const bool verify =
+              absl::GetFlag(FLAGS_verify_load) && !InHostMemory(addr, count);
+          std::vector<uint8_t> check(verify ? count : 0);
           if (!WriteMem(addr, bytes, count) ||
-              !ReadMem(addr, check.data(), count) ||
-              std::memcmp(check.data(), bytes, count) != 0) {
+              (verify && (!ReadMem(addr, check.data(), count) ||
+                          std::memcmp(check.data(), bytes, count) != 0))) {
             LOG(ERROR) << "ELF segment load/verify failed at " << Hex(addr);
             ok = false;
           }
@@ -737,6 +786,7 @@ bool ArcsimTb::LoadElf(const std::string& path) {
     if (::LookupSymbol(data8, "tohost_ready", &sym)) tohost_ready_addr_ = sym;
     if (::LookupSymbol(data8, "fromhost", &sym)) fromhost_addr_ = sym;
     if (::LookupSymbol(data8, "fromhost_ready", &sym)) fromhost_ready_addr_ = sym;
+    elf_data_.assign(data8, data8 + file_size);
     if ((tohost_addr_ || tohost_ready_addr_) && !has_dbus_) {
       LOG(WARNING) << arcsim_model::kTopName
                    << " has no io_debug_dbus_* ports; HTIF tohost/semihosting "
@@ -752,6 +802,24 @@ bool ArcsimTb::LoadElf(const std::string& path) {
   uint32_t readback = 0;
   return Write32(kCsrAddr + 0x4, entry) && Read32(kCsrAddr + 0x4, &readback) &&
          readback == entry;
+}
+
+bool ArcsimTb::WriteSymbol(const std::string& name, uint32_t value) {
+  uint64_t addr;
+  if (elf_data_.empty() || !::LookupSymbol(elf_data_.data(), name, &addr)) {
+    LOG(ERROR) << "symbol not found: " << name;
+    return false;
+  }
+  return WriteMem(addr, reinterpret_cast<const uint8_t*>(&value), sizeof(value));
+}
+
+bool ArcsimTb::ReadSymbol(const std::string& name, uint32_t* value) {
+  uint64_t addr;
+  if (elf_data_.empty() || !::LookupSymbol(elf_data_.data(), name, &addr)) {
+    LOG(ERROR) << "symbol not found: " << name;
+    return false;
+  }
+  return ReadMem(addr, reinterpret_cast<uint8_t*>(value), sizeof(*value));
 }
 
 // Same sequence as core_mini_axi_sim.cc: ClockGate(false), then Reset(false).
@@ -942,6 +1010,16 @@ int main(int argc, char** argv) {
   circt_sv_set_plusargs(plusargs.c_str());
 #endif
 
+  std::vector<std::pair<std::string, uint32_t>> overrides;
+  for (const auto& arg : absl::GetFlag(FLAGS_set)) {
+    auto parsed = coralnpu_sim::ParseSymbolAssignment(arg);
+    if (!parsed) {
+      LOG(ERROR) << "bad --set entry (want symbol=value): " << arg;
+      return 1;
+    }
+    overrides.push_back(*parsed);
+  }
+
   const std::string binary = absl::GetFlag(FLAGS_binary);
   if (binary.empty()) {
     LOG(ERROR) << "--binary is required";
@@ -966,6 +1044,12 @@ int main(int argc, char** argv) {
     LOG(ERROR) << "Failed to load " << binary;
     return 1;
   }
+  for (const auto& [name, value] : overrides) {
+    if (!tb.WriteSymbol(name, value)) {
+      LOG(ERROR) << "--set " << name << " failed";
+      return 1;
+    }
+  }
   const uint64_t load_cycles = tb.cycles();
   tb.Start();
   const uint64_t start = tb.cycles();
@@ -976,6 +1060,15 @@ int main(int argc, char** argv) {
             !(tb.tohost_halt() && tb.tohost_val() != 1);
   if (finished && !tb.fault() && !tb.tohost_halt()) {
     ok = tb.CheckStatus() && ok;
+  }
+
+  for (const auto& name : absl::GetFlag(FLAGS_dump)) {
+    uint32_t value = 0;
+    if (tb.ReadSymbol(name, &value)) {
+      std::printf("SYMBOL %s=%u\n", name.c_str(), value);
+    } else {
+      LOG(ERROR) << "--dump " << name << " failed";
+    }
   }
 
   const double wall = std::chrono::duration<double>(

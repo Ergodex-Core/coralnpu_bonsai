@@ -265,6 +265,7 @@ def arcsim_sim_binary(name, model, defines = [], deps = [], tags = [], **kwargs)
         deps = [
             model,
             "@coralnpu_hw//tests/verilator_sim:elf",
+            "@coralnpu_hw//tests/verilator_sim:symbol_args",
             "@com_google_absl//absl/flags:flag",
             "@com_google_absl//absl/flags:parse",
             "@com_google_absl//absl/flags:usage",
