@@ -85,6 +85,11 @@ ABSL_FLAG(bool, verify_load, true,
 ABSL_FLAG(std::vector<std::string>, set, {},
           "Comma-separated symbol=value 32-bit writes applied after the ELF "
           "is loaded, e.g. active_m=1,active_epsilon=f32:1e-6");
+ABSL_FLAG(int, axi_read_latency, 0,
+          "External memory latency in cycles from AR acceptance to the first R "
+          "beat. Reads are pipelined (many outstanding, like a DRAM controller).");
+ABSL_FLAG(int, axi_write_latency, 0,
+          "Cycles from the last W beat to the B response.");
 ABSL_FLAG(std::vector<std::string>, dump, {},
           "Comma-separated symbols whose 32-bit values are printed after the "
           "run as 'SYMBOL name=value'");
@@ -281,6 +286,8 @@ class ArcsimTb {
       : max_cycles_(max_cycles),
         debug_axi_(debug_axi),
         memory_(kMemorySizeBytes, 0xa5) {
+    read_latency_ = absl::GetFlag(FLAGS_axi_read_latency);
+    write_latency_ = absl::GetFlag(FLAGS_axi_write_latency);
     clk_ = model_.Require("io_aclk");
     resetn_ = model_.Require("io_aresetn");
     halted_ = model_.Require("io_halted");
@@ -381,6 +388,7 @@ class ArcsimTb {
 
  public:
   // --set / --dump support. Valid after LoadElf().
+  bool SymbolAddr(const std::string& name, uint64_t* addr);
   bool WriteSymbol(const std::string& name, uint32_t value);
   bool ReadSymbol(const std::string& name, uint32_t* value);
 
@@ -409,10 +417,18 @@ class ArcsimTb {
   std::unordered_map<uint64_t, std::unique_ptr<uint8_t[]>> ddr_pages_;
   std::vector<uint8_t> elf_data_;
   std::string uart_line_;
-  bool rd_busy_ = false, wr_busy_ = false;
-  uint32_t rd_addr_ = 0, wr_addr_ = 0, rd_left_ = 0, wr_left_ = 0;
-  uint32_t rd_size_ = 0, wr_size_ = 0, rd_id_ = 0, wr_id_ = 0;
-  uint32_t rd_burst_ = 1, wr_burst_ = 1;
+  // Accepted reads, served in order once `ready` (AR cycle + latency) passes.
+  struct ReadReq {
+    uint32_t addr, left, size, burst, id;
+    uint64_t ready;
+  };
+  std::deque<ReadReq> reads_;
+  static constexpr size_t kMaxReads = 64;
+  uint64_t read_latency_ = 0, write_latency_ = 0;
+  bool wr_busy_ = false, b_pending_ = false;
+  uint64_t b_ready_ = 0;
+  uint32_t wr_addr_ = 0, wr_left_ = 0, wr_size_ = 0, wr_id_ = 0;
+  uint32_t wr_burst_ = 1;
   uint8_t wr_resp_ = kRespOkay;
 
   // AXI slave initiator.
@@ -450,7 +466,8 @@ void ArcsimTb::Cycle() {
 
 void ArcsimTb::OnPosedge() {
   if (!Old(resetn_)) {
-    rd_busy_ = wr_busy_ = false;
+    reads_.clear();
+    wr_busy_ = b_pending_ = false;
     model_.Set(master_.r_valid, 0);
     model_.Set(master_.b_valid, 0);
     SetMasterReady();
@@ -464,38 +481,53 @@ void ArcsimTb::OnPosedge() {
 
 void ArcsimTb::SetMasterReady() {
   const bool rst = model_.Get(resetn_);
-  model_.Set(master_.ar_ready,
-             rst && !rd_busy_ && !model_.Get(master_.r_valid));
+  model_.Set(master_.ar_ready, rst && reads_.size() < kMaxReads);
   model_.Set(master_.aw_ready,
-             rst && !wr_busy_ && !model_.Get(master_.b_valid));
+             rst && !wr_busy_ && !b_pending_ && !model_.Get(master_.b_valid));
   model_.Set(master_.w_ready, rst && wr_busy_ && !model_.Get(master_.b_valid));
 }
 
-// AXI master target: one outstanding read and one outstanding write, single
-// cycle latency. Supports FIXED and INCR bursts.
+// AXI master target. Reads are pipelined: each accepted AR is answered
+// --axi_read_latency cycles later, in order, one beat per cycle. One write at a
+// time; its B response comes --axi_write_latency cycles after the last W beat.
+// Supports FIXED and INCR bursts.
 void ArcsimTb::ServeMaster() {
   const AxiPorts& m = master_;
-  const bool rb = rd_busy_;
   const bool wb = wr_busy_;
   auto next_addr = [](uint32_t addr, uint32_t size, uint32_t burst) {
     return burst == 0 ? addr : addr + (1u << size);
   };
 
-  if (Old(m.ar_valid) && Old(m.ar_ready)) {
-    rd_busy_ = true;
-    rd_addr_ = static_cast<uint32_t>(Old(m.ar_addr));
-    rd_left_ = static_cast<uint32_t>(Old(m.ar_len));
-    rd_size_ = static_cast<uint32_t>(Old(m.ar_size));
-    rd_burst_ = static_cast<uint32_t>(Old(m.ar_burst));
-    rd_id_ = m.ar_id ? static_cast<uint32_t>(Old(m.ar_id)) : 0;
-    CHECK(rd_burst_ <= 1) << "unsupported AXI read burst type " << rd_burst_;
-    if (debug_axi_) {
-      LOG(INFO) << "AXI master AR addr=" << Hex(rd_addr_) << " len=" << rd_left_
-                << " size=" << rd_size_ << " id=" << rd_id_;
+  const bool r_taken = Old(m.r_valid) && Old(m.r_ready);
+  if (r_taken) {
+    model_.Set(m.r_valid, 0);
+    ReadReq& r = reads_.front();
+    if (r.left == 0) {
+      reads_.pop_front();
+    } else {
+      --r.left;
+      r.addr = next_addr(r.addr, r.size, r.burst);
     }
   }
-  if (rb && !Old(m.r_valid)) {
-    const uint32_t base = rd_addr_ & ~(bus_bytes_ - 1);
+  if (Old(m.ar_valid) && Old(m.ar_ready)) {
+    ReadReq r;
+    r.addr = static_cast<uint32_t>(Old(m.ar_addr));
+    r.left = static_cast<uint32_t>(Old(m.ar_len));
+    r.size = static_cast<uint32_t>(Old(m.ar_size));
+    r.burst = static_cast<uint32_t>(Old(m.ar_burst));
+    r.id = m.ar_id ? static_cast<uint32_t>(Old(m.ar_id)) : 0;
+    r.ready = cycles_ + read_latency_;
+    CHECK(r.burst <= 1) << "unsupported AXI read burst type " << r.burst;
+    if (debug_axi_) {
+      LOG(INFO) << "AXI master AR addr=" << Hex(r.addr) << " len=" << r.left
+                << " size=" << r.size << " id=" << r.id;
+    }
+    reads_.push_back(r);
+  }
+  if ((!Old(m.r_valid) || r_taken) && !reads_.empty() &&
+      reads_.front().ready <= cycles_) {
+    const ReadReq& r = reads_.front();
+    const uint32_t base = r.addr & ~(bus_bytes_ - 1);
     U128 data = 0;
     uint8_t resp = kRespOkay;
     if (InHostMemory(base, bus_bytes_)) {
@@ -506,19 +538,10 @@ void ArcsimTb::ServeMaster() {
       resp = kRespDecErr;
     }
     model_.Set(m.r_data, data);
-    model_.SetIf(m.r_id, rd_id_);
+    model_.SetIf(m.r_id, r.id);
     model_.Set(m.r_resp, resp);
-    model_.Set(m.r_last, rd_left_ == 0);
+    model_.Set(m.r_last, r.left == 0);
     model_.Set(m.r_valid, 1);
-  }
-  if (Old(m.r_valid) && Old(m.r_ready)) {
-    model_.Set(m.r_valid, 0);
-    if (rd_left_ == 0) {
-      rd_busy_ = false;
-    } else {
-      --rd_left_;
-      rd_addr_ = next_addr(rd_addr_, rd_size_, rd_burst_);
-    }
   }
 
   if (Old(m.aw_valid) && Old(m.aw_ready)) {
@@ -555,15 +578,20 @@ void ArcsimTb::ServeMaster() {
     }
     if (wr_left_ == 0) {
       wr_busy_ = false;
-      model_.SetIf(m.b_id, wr_id_);
-      model_.Set(m.b_resp, wr_resp_);
-      model_.Set(m.b_valid, 1);
+      b_pending_ = true;
+      b_ready_ = cycles_ + write_latency_;
     } else {
       --wr_left_;
       wr_addr_ = next_addr(wr_addr_, wr_size_, wr_burst_);
     }
   }
   if (Old(m.b_valid) && Old(m.b_ready)) model_.Set(m.b_valid, 0);
+  if (b_pending_ && b_ready_ <= cycles_ && !model_.Get(m.b_valid)) {
+    b_pending_ = false;
+    model_.SetIf(m.b_id, wr_id_);
+    model_.Set(m.b_resp, wr_resp_);
+    model_.Set(m.b_valid, 1);
+  }
   SetMasterReady();
 }
 
@@ -804,9 +832,20 @@ bool ArcsimTb::LoadElf(const std::string& path) {
          readback == entry;
 }
 
+// `name` may carry a byte offset, e.g. kargs+68 for a struct field.
+bool ArcsimTb::SymbolAddr(const std::string& name, uint64_t* addr) {
+  const size_t plus = name.find('+');
+  if (elf_data_.empty() ||
+      !::LookupSymbol(elf_data_.data(), name.substr(0, plus), addr)) {
+    return false;
+  }
+  if (plus != std::string::npos) *addr += std::stoul(name.substr(plus + 1), nullptr, 0);
+  return true;
+}
+
 bool ArcsimTb::WriteSymbol(const std::string& name, uint32_t value) {
   uint64_t addr;
-  if (elf_data_.empty() || !::LookupSymbol(elf_data_.data(), name, &addr)) {
+  if (!SymbolAddr(name, &addr)) {
     LOG(ERROR) << "symbol not found: " << name;
     return false;
   }
@@ -815,7 +854,7 @@ bool ArcsimTb::WriteSymbol(const std::string& name, uint32_t value) {
 
 bool ArcsimTb::ReadSymbol(const std::string& name, uint32_t* value) {
   uint64_t addr;
-  if (elf_data_.empty() || !::LookupSymbol(elf_data_.data(), name, &addr)) {
+  if (!SymbolAddr(name, &addr)) {
     LOG(ERROR) << "symbol not found: " << name;
     return false;
   }

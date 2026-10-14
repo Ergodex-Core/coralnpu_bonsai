@@ -230,6 +230,12 @@ class CoreMiniAxiInterface:
         self.memory_base_addr = ext_mem_base_addr
         self.memory = np.zeros([ext_mem_size], dtype=np.uint8)
         self.read_delay_cycles = read_delay_cycles
+        # Pipelined external-memory latency in cycles, measured from AR/AW
+        # acceptance to the first R beat / B response. Any number of requests
+        # may be in flight (like a DRAM controller); 0 keeps the old timing.
+        self.read_latency = int(os.environ.get("AXI_READ_LATENCY", "0"))
+        self.write_latency = int(os.environ.get("AXI_WRITE_LATENCY", "0"))
+        self.cycle = 0
         self.master_arfifo = Queue()
         self.master_awfifo = Queue()
         self.master_rfifo = Queue()
@@ -324,6 +330,7 @@ class CoreMiniAxiInterface:
         self.dut.io_axi_master_write_data_ready.value = 1
         while True:
             await RisingEdge(self.dut.io_aclk)
+            self.cycle += 1
             # slave_bagent
             if self.dut.io_axi_slave_write_resp_valid.value == 1:
                 try:
@@ -386,6 +393,7 @@ class CoreMiniAxiInterface:
                         "burst"
                     ] = self.dut.io_axi_master_read_addr_bits_burst.value.to_unsigned(
                     )
+                    ardata["cycle"] = self.cycle
                     await self.master_arfifo.put(ardata)
                 except Exception as e:
                     print("X seen in master_aragent: " + str(e))
@@ -411,6 +419,7 @@ class CoreMiniAxiInterface:
                         "len"
                     ] = self.dut.io_axi_master_write_addr_bits_len.value.to_unsigned(
                     )
+                    awdata["cycle"] = self.cycle
                     await self.master_awfifo.put(awdata)
                 except Exception as e:
                     print("X seen in master_awagent: " + str(e))
@@ -456,23 +465,19 @@ class CoreMiniAxiInterface:
             ardata = await self.master_arfifo.get()
             if self.read_delay_cycles > 0:
                 await ClockCycles(self.dut.io_aclk, self.read_delay_cycles)
-            data = self.read_memory(ardata)
-            if data is None:
-                for i in range(0, ardata["len"] + 1):
-                    rdata = dict()
-                    rdata["id"] = ardata["id"]
-                    rdata["data"] = 0
-                    rdata["resp"] = AxiResp.SLVERR
-                    rdata["last"] = 1 if (i == ardata["len"]) else 0
-                    await self.master_rfifo.put(rdata)
-            else:
-                for i in range(0, ardata["len"] + 1):
-                    rdata = dict()
-                    rdata["id"] = ardata["id"]
-                    rdata["data"] = convert_to_binary_value(data)
-                    rdata["resp"] = AxiResp.OKAY
-                    rdata["last"] = 1 if (i == ardata["len"]) else 0
-                    await self.master_rfifo.put(rdata)
+            while self.cycle < ardata.get("cycle", 0) + self.read_latency:
+                await RisingEdge(self.dut.io_aclk)
+            for i in range(0, ardata["len"] + 1):
+                beat = dict(ardata)
+                if ardata["burst"] == AxiBurst.INCR:  # next row each beat
+                    beat["addr"] = ardata["addr"] + i * (2**ardata["size"])
+                data = self.read_memory(beat)
+                rdata = dict()
+                rdata["id"] = ardata["id"]
+                rdata["data"] = 0 if data is None else convert_to_binary_value(data)
+                rdata["resp"] = AxiResp.SLVERR if data is None else AxiResp.OKAY
+                rdata["last"] = 1 if (i == ardata["len"]) else 0
+                await self.master_rfifo.put(rdata)
 
     async def master_ragent(self, timeout=4096):
         self.axi_master_read_data.clear_valid()
@@ -517,6 +522,8 @@ class CoreMiniAxiInterface:
             bdata = dict()
             bdata["id"] = awdata["id"]
             bdata["resp"] = AxiResp.OKAY if ret else AxiResp.SLVERR
+            while self.cycle < awdata.get("cycle", 0) + self.write_latency:
+                await RisingEdge(self.dut.io_aclk)
             await self.master_bfifo.put(bdata)
 
     async def master_bagent(self, timeout=4096):

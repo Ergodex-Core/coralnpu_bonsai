@@ -58,7 +58,8 @@ install_bundle() {
     mkdir -p "${dest}"
     local tmp
     tmp="$(mktemp -d "${dest}/.extract.XXXXXX")"
-    trap 'rm -rf "${tmp}"' EXIT
+    # Expanded now: tmp is local and gone by the time the EXIT trap runs.
+    trap "rm -rf '${tmp}'" EXIT
     unzip -q "${zip}" -d "${tmp}"
     [[ -d "${tmp}/${name}" ]] || { echo "error: ${zip} has no top-level ${name}/" >&2; exit 1; }
     (cd "${tmp}/${name}" && sha256sum --quiet -c SHA256SUMS)

@@ -61,6 +61,8 @@ _CORES = {
         ["HIGHMEM_RTL"],
     ),
     "vme_core_mini_axi": ("VmeCoreMiniAxi", VME_CORE_MINI_AXI_VOPTS, _RVV_HDRS, []),
+    # VmeCoreMiniAxi with the LSU read-prefetch bridge (DBus2AxiStream).
+    "vme_core_mini_pf_axi": ("VmeCoreMiniPfAxi", VME_CORE_MINI_AXI_VOPTS, _RVV_HDRS, []),
     "vme_core_mini_highmem_axi": (
         "VmeCoreMiniHighmemAxi",
         VME_CORE_MINI_AXI_VOPTS,
