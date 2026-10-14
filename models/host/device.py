@@ -19,6 +19,7 @@ the core at the entry point and waits for the halt.
 """
 
 import asyncio
+import fcntl
 import inspect
 import os
 import struct
@@ -99,6 +100,14 @@ class F2Backend(Backend):
   """AWS F2 image through fpga/aws/f2/f2_device.py."""
 
   def __init__(self, slot=0, check_image=True):
+    # Advisory lock: one process drives a slot at a time. A second process
+    # resetting the core mid-kernel shows up as a halt timeout in the first.
+    self._lock = open(f"/tmp/coralnpu-f2-slot{slot}.lock", "w")
+    try:
+      fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+      print(f"waiting for F2 slot {slot} (another process holds the lock)", flush=True)
+      fcntl.flock(self._lock, fcntl.LOCK_EX)
     if check_image:
       f2_device.require_image(slot)
     self.dev = f2_device.F2Device(slot)
@@ -133,6 +142,8 @@ class F2Backend(Backend):
 
   def close(self):
     self.dev.close()
+    fcntl.flock(self._lock, fcntl.LOCK_UN)
+    self._lock.close()
 
 
 def _run(coro_or_value):
