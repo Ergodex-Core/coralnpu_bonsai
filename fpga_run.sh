@@ -47,7 +47,9 @@ Usage: $(basename "$0") [options] <model>
   path/to/model.tflite         converted to TOSA MLIR, then compiled
   path/to/artifacts-dir        export_gemma_f2 output (<model>.mlir/.json/_params.npz)
   gemma3-1b | functiongemma-270m | gemma3-270m
-                               export (needs HF_TOKEN), compile, run
+                               export, compile, run. gemma3-1b uses the public
+                               Q4_0 GGUF gaunernst/gemma-3-1b-it-int4-gguf; the
+                               others need HF_TOKEN for the gated checkpoints
 
 Options:
   --slot N              FPGA slot (default ${SLOT})
@@ -201,7 +203,7 @@ run_gemma() {  # <artifacts dir>
 export_gemma() {  # <model name> -> artifacts dir
   local dir="${REPO_DIR}/artifacts/$1"
   if [[ ! -f "${dir}/$1.mlir" ]]; then
-    [[ -n "${HF_TOKEN:-}" ]] || log "HF_TOKEN not set; the Gemma checkpoints are gated"
+    [[ "$1" == "gemma3-1b" || -n "${HF_TOKEN:-}" ]] || log "HF_TOKEN not set; $1's checkpoint is gated"
     log "exporting $1 (int4 weights, int8 activations) to ${dir}"
     (cd "${COMPILER_DIR}" && bazel build --config=dev //examples/gemma3-jax-aot:export_gemma_f2)
     "$(bazel_bin)/examples/gemma3-jax-aot/export_gemma_f2" --model "$1" --out "${dir}"

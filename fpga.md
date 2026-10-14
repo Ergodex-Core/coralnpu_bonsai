@@ -121,7 +121,7 @@ Software added for this image, all under the `fpga-workflow` branch:
 | F2 host library | `fpga/aws/f2/` | `f2_device.py` (BAR0 TCM/CSR, BAR4 DDR/HBM, reset/start/halt) and `run_elf.py` |
 | F2 compiler backend | `third_party/coralnpu-compiler/runtime/sim/f2/` | `--simulator=f2`: runs IREE dispatches over PCIe; `CORALNPU_PERSISTENT_DEVICE_MEMORY=1` keeps weights resident in DDR |
 | Zvt feature gating | compiler `CoralNPUTileSizeSelectionUtils.cpp` + IREE patch 0006 | bf16 / int8 / f32 matrix modes each require their own target feature. Use `+m,+f,+zvl128b,+zve32f,+zvtbase,+zvt8e,+zvti8i32mm,+zvtf32f32mm` for this image |
-| Gemma export | compiler `examples/gemma3-jax-aot/{gemma_f2,export_gemma_f2,chat_f2}.py` | HF safetensors to gemma params, int4 packed weights with f32 per-channel scales, int8 activations, f32 residual/KV cache, no bf16 |
+| Gemma export | compiler `examples/gemma3-jax-aot/{gemma_f2,export_gemma_f2,chat_f2}.py` | Gemma3-1B from `gaunernst/gemma-3-1b-it-int4-gguf` (llama.cpp Q4_0: int4 codes in groups of 32 kept exactly, f16 scales); 270M/FunctionGemma from bf16 safetensors quantized here to per-channel int4. int8 activations (per group for Q4_0), f32 residual/KV cache, no bf16 |
 | Tools | `tools/mlx_reference.py`, `tools/compare_tokens.py`, `tools/estimate_tps.py` | MLX quality reference on a Mac, record comparison, 1 GHz tokens/s estimate from MPACT cycles |
 
 Facts about the image that drove the design (from the frozen RTL in S3):
@@ -133,7 +133,7 @@ Typical session on the F2 host:
 
 ```bash
 source aws-fpga/sdk_setup.sh
-export HF_TOKEN=...   # gemma-3-1b-it-qat-int4-unquantized and functiongemma-270m-it are gated
+export HF_TOKEN=...   # functiongemma-270m-it is gated; the Gemma3-1B GGUF is public
 ./fpga_run.sh --load bazel-bin/path/to/hello.elf
 ./fpga_run.sh --backend mpact --profile-log prof.log functiongemma-270m   # golden + 1 GHz estimate
 ./fpga_run.sh --reference artifacts/functiongemma-270m/run_mpact.json functiongemma-270m
