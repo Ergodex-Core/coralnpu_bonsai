@@ -29,3 +29,8 @@ toolchain/build_scripts/*.tar.*
 uvm_regression_*/
 uvm_regression_*.zip
 dispatch.log
+
+# ArcSim vendor packages and extracted bundles (Linux x86-64; not checked in)
+arcsim_*.deb
+arcsim-*.zip
+arcsim-*/
