@@ -29,9 +29,10 @@ into per-layer and per-token decode estimates:
   * Inputs keep their ELF initial values (zeros, or the testbench's 0xa5 fill).
     The kernels' control flow is shape-driven, so cycle counts do not depend
     on the data except for floating-point corner cases.
-  * Cycle counts assume single-cycle-latency testbench memory for EXTMEM/DDR
-    (see tests/systemc/Xbar.h); real DDR latency will add to memory-bound
-    kernels.
+  * Matmul weights live in DDR (.ddr_data); activations stay in TCM.
+    --axi_read_latency / --axi_write_latency add external-memory latency in
+    both simulators (default 0: single-cycle testbench memory). Use the
+    calibrated F2 value (doc/arcsim.md) to approximate the FPGA's memory path.
 """
 
 import argparse
@@ -132,6 +133,7 @@ def catalog(cfg, kv_len):
     lm_head = {
         "fp32": (_matmul("rvv_matmul", 1, h, 1024), cfg["vocab"] // 1024),
         "bf16": (_matmul("rvv_bf16_matmul", 1, h, 1024), cfg["vocab"] // 1024),
+        "int8 matmul": (_matmul("rvv_int8_matmul", 1, h, 512), cfg["vocab"] // 512),
     }
     final_norm = {
         "fp32": _rms("rvv_rms_norm", 1, h),
@@ -145,9 +147,11 @@ _SUMMARY = re.compile(r"^(VERILATOR|ARCSIM) (PASS|FAIL) .*?\bwall_s=([0-9.]+)",
                       re.MULTILINE)
 
 
-def run_kernel(sim_kind, sim, elf, settings, timeout):
+def run_kernel(sim_kind, sim, elf, settings, timeout, latency):
     sets = ",".join("{}={}".format(k, v) for k, v in settings.items())
-    cmd = [sim, "--binary=" + elf, "--set=" + sets, "--dump=cycle_count"]
+    cmd = [sim, "--binary=" + elf, "--set=" + sets, "--dump=cycle_count",
+           "--axi_read_latency={}".format(latency[0]),
+           "--axi_write_latency={}".format(latency[1])]
     if sim_kind == "verilator":
         cmd.append("--backdoor_load")
     else:
@@ -203,6 +207,10 @@ def main(argv):
     parser.add_argument("--no_lm_head",
                         action="store_true",
                         help="exclude the 640x262144 LM head from per-token totals")
+    parser.add_argument("--axi_read_latency", type=int, default=0,
+                        help="external memory read latency, cycles")
+    parser.add_argument("--axi_write_latency", type=int, default=0,
+                        help="external memory write latency, cycles")
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--json", help="write results here")
     parser.add_argument("--markdown", help="write the report here")
@@ -241,6 +249,7 @@ def main(argv):
         plan[prec] = [(label, need(k), k, n) for label, k, n in layer_kernels[prec]]
         if prec in lm_head:
             need(lm_head[prec][0])
+        if prec in final_norm:
             need(final_norm[prec])
 
     missing = sorted({k[0] for k in jobs} - set(elfs))
@@ -252,7 +261,8 @@ def main(argv):
         results[key] = {}
         for sim_kind, sim in sims.items():
             r = run_kernel(sim_kind, sim, elfs[kernel["elf"]], kernel["set"],
-                           args.timeout)
+                           args.timeout,
+                           (args.axi_read_latency, args.axi_write_latency))
             results[key][sim_kind] = r
             print("{:<26} {:<22} {:<9} cycles={:<10} {} sim_wall={:.1f}s".format(
                 kernel["elf"], kernel["shape"], sim_kind, r["cycles"],
@@ -270,7 +280,10 @@ def main(argv):
     lines.append("")
     lines.append("Simulators: {}. Cycle counts are mcycle deltas measured by "
                  "the kernels. Estimates use {} cycles. Context length {}. "
-                 "Host {}.".format(", ".join(sims), ref, args.kv_len, host))
+                 "External memory latency: read {}, write {} cycles. "
+                 "Host {}.".format(", ".join(sims), ref, args.kv_len,
+                                   args.axi_read_latency,
+                                   args.axi_write_latency, host))
     lines.append("")
 
     # Per-kernel table.
@@ -333,9 +346,10 @@ def main(argv):
         lines.append("")
         token = layer * cfg["layers"]
         parts = ["{} layers".format(cfg["layers"])]
-        if prec in lm_head:
+        if prec in final_norm:
             token += cycles_of(need(final_norm[prec]))
             parts.append("final norm")
+        if prec in lm_head:
             if not args.no_lm_head:
                 tile, n = lm_head[prec]
                 token += cycles_of(need(tile)) * n
@@ -358,8 +372,8 @@ def main(argv):
     lines.append("Notes: matmuls larger than the runner buffers are tiled and "
                  "the tile count multiplies the tile cycles; partial-sum "
                  "accumulation between tiles is not included. int8 rows cover "
-                 "matmuls only. Testbench memory has single-cycle latency, so "
-                 "memory-bound kernels will be slower with real DDR.")
+                 "matmuls only. Matmul weights stream from DDR. Host launch "
+                 "overhead (PCIe, sequencing) is not included.")
     report = "\n".join(lines) + "\n"
     print()
     print(report)

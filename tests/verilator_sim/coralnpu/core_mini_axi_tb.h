@@ -211,6 +211,11 @@ struct CoreMiniAxi_tb : Sysc_tb {
   void SetSymbolOverrides(std::vector<std::pair<std::string, uint32_t>> overrides) {
     symbol_overrides_ = std::move(overrides);
   }
+  // External-memory (EXTMEM and DDR) latency in clock cycles. Reads are
+  // pipelined: latency counts from AR acceptance to the first R beat.
+  void SetMemoryLatency(int read_cycles, int write_cycles) {
+    xbar_.SetLatency(read_cycles * clock.period(), write_cycles * clock.period());
+  }
   // Reads the 32-bit value at an ELF symbol of the loaded program, from TCM
   // (SRAM backdoor) or testbench memory. Use after the core has halted.
   absl::Status ReadSymbol(const std::string &name, uint32_t *value);

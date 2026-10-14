@@ -58,6 +58,20 @@ PERF_TESTCASES = [
     "test_perf_topk",
 ]
 
+# Replays fpga_kernels_test.py for memory-latency calibration against the F2.
+F2_CALIBRATION_TESTCASES = [
+    "test_calib_matvec_decode",
+    "test_calib_matvec_q4",
+    "test_calib_quant_act",
+    "test_calib_rmsnorm",
+    "test_calib_rope",
+    "test_calib_attention",
+    "test_calib_gelu_mul",
+    "test_calib_embed",
+    "test_calib_topk",
+    "test_calib_topk_big",
+]
+
 FUSED_PERF_TESTCASES = [
     "test_fused_matvec_dim",
     "test_fused_matvec_attn_out",
@@ -97,6 +111,7 @@ FUSED_PERF_TESTCASES = [
         ("kernels_cocotb_test", KERNEL_TESTCASES, "KERNEL_TESTCASES"),
         ("kernels_perf_cocotb_test", PERF_TESTCASES, "PERF_TESTCASES"),
         ("kernels_fused_perf_cocotb_test", FUSED_PERF_TESTCASES, "FUSED_PERF_TESTCASES"),
+        ("f2_calibration_cocotb_test", F2_CALIBRATION_TESTCASES, "F2_CALIBRATION_TESTCASES"),
     ]
     for suffix, toplevel, model in [
         ("", "VmeCoreMiniAxi", "//tests/cocotb:vme_core_mini_axi_model"),

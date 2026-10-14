@@ -1,0 +1,47 @@
+--- a/tlm-bridges/axi2tlm-bridge.h	2026-10-14 18:18:47
++++ b/tlm-bridges/axi2tlm-bridge.h	2026-10-14 18:18:56
+@@ -279,7 +279,8 @@
+ 			m_dataIdx(0),
+ 			m_delay(SC_ZERO_TIME),
+ 			m_abortScheduled(false),
+-			m_TLMOngoing(false)
++			m_TLMOngoing(false),
++			m_issued(sc_time_stamp())
+ 		{
+ 			uint32_t dataLen;
+ 			uint8_t *data;
+@@ -594,6 +595,9 @@
+ 
+ 		void SetAbortScheduled() { m_abortScheduled = true; }
+ 		bool AbortScheduled() { return m_abortScheduled; }
++
++		// Simulation time at which the address phase was accepted.
++		sc_time IssueTime() { return m_issued; }
+ 
+ 		void SetTLMOngoing(bool TLMOngoing = true)
+ 		{
+@@ -651,6 +655,7 @@
+ 
+ 		bool m_abortScheduled;
+ 		bool m_TLMOngoing;
++		sc_time m_issued;
+ 	};
+ 
+ 	Transaction *GetFirstWithID(std::list<Transaction*> *list,
+@@ -818,6 +823,16 @@
+ 			// Wait for annotated delay but abort if reset is
+ 			// asserted.
+ 			//
++			// For reads the delay counts from AR acceptance rather
++			// than from when this transaction reached the head of
++			// its ID queue, so same-ID reads overlap like a
++			// pipelined memory controller.
++			//
++			if (m_gp->is_read()) {
++				sc_time ready = tr->IssueTime() + delay;
++				delay = ready > sc_time_stamp() ?
++					ready - sc_time_stamp() : SC_ZERO_TIME;
++			}
+ 			wait(delay, resetn.negedge_event());
+ 
+ 			if (reset_asserted()) {

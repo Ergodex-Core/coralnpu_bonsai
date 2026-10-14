@@ -47,6 +47,11 @@ ABSL_FLAG(bool, backdoor_load, false, "Enable high-speed backdoor code loading")
 ABSL_FLAG(std::vector<std::string>, set, {},
           "Comma-separated symbol=value 32-bit writes applied after the ELF "
           "is loaded, e.g. active_m=1,active_epsilon=f32:1e-6");
+ABSL_FLAG(int, axi_read_latency, 0,
+          "External memory latency in cycles from AR acceptance to the first R "
+          "beat. Reads are pipelined (many outstanding, like a DRAM controller).");
+ABSL_FLAG(int, axi_write_latency, 0,
+          "Cycles from the last W beat to the B response.");
 ABSL_FLAG(std::vector<std::string>, dump, {},
           "Comma-separated symbols whose 32-bit values are printed after the "
           "run as 'SYMBOL name=value'");
@@ -75,6 +80,8 @@ static bool run(const char* name, const std::string binary, const int cycles,
     tb.trace(tb.core());
   }
 
+  tb.SetMemoryLatency(absl::GetFlag(FLAGS_axi_read_latency),
+                      absl::GetFlag(FLAGS_axi_write_latency));
   tb.SetSymbolOverrides(std::move(overrides));
   std::thread sc_main_thread([&tb]() { tb.start(); });
 
