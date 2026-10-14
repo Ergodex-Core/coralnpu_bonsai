@@ -75,9 +75,13 @@
 #define MTYPE_ACC  ((16 << 10) | (1 << 5) | 1)
 #define VTYPE_E8M1  0xC0
 #define VTYPE_E32M4 0xD2
-#define VTZERO0   0x43EF6057   // vtzero mt0        (ZVT_WORD 0x10,30,0,6,0)
-#define VTMMS0    0xF2880077   // vtmms.tvv mt0, v8.., v16.. signed A (rd=1)
-#define VTMV_V_T  0x43F56257   // vtmv.v.t v4.., a0  (tss in a0)
+// Instruction words computed by the assembler from the encoding used in
+// models/common/zvt.h: funct6<<26 | vm<<25 | vs2<<20 | rs1<<15 | f3<<12 | rd<<7 | op.
+#define ZVT_WORD(f6, vs2, rs1, f3, rd, op) \
+  ((((f6) << 26) | (1 << 25) | ((vs2) << 20) | ((rs1) << 15) | ((f3) << 12) | ((rd) << 7) | (op)))
+#define VTZERO0   ZVT_WORD(0x10, 30, 0, 6, 0, 0x57)    // vtzero mt0
+#define VTMMS0    ZVT_WORD(0x3C, 8, 16, 0, 1, 0x77)    // vtmms.tvv mt0, v8.., v16.. (signed A)
+#define VTMV_V_T  ZVT_WORD(0x10, 31, 10, 6, 4, 0x57)   // vtmv.v.t v4.., a0 (tss)
 
     .text
     .globl main
