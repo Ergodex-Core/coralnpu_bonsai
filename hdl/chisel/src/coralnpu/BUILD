@@ -377,6 +377,19 @@ chisel_test(
 )
 
 chisel_test(
+    name = "coralnpu_dbus2axi_stream_tests",
+    size = "large",
+    srcs = [
+        "DBus2AxiStreamTest.scala",
+    ],
+    deps = [
+        ":coralnpu",
+        ":coralnpu_base",
+        "//hdl/chisel/src/bus",
+    ],
+)
+
+chisel_test(
     name = "coralnpu_fabric_arbiter_tests",
     size = "large",
     srcs = [
