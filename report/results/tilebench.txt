@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/ubuntu/coralnpu_models/models/tests/tilebench.py", line 48, in <module>
+    main()
+  File "/home/ubuntu/coralnpu_models/models/tests/tilebench.py", line 41, in main
+    print(f"{region} {label:24s}: {r.cycles:9d} cycles  {n / r.cycles:5.2f} B/cycle  "
+                                                         ~~^~~~~~~~~~
+ZeroDivisionError: division by zero

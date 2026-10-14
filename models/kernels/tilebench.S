@@ -22,6 +22,7 @@
     .text
     .globl main
 main:
+    csrr s1, mcycle
     la   t0, kargs
     lw   a1, 12(t0)          // flags
     lw   a2, 16(t0)          // in0
@@ -120,6 +121,9 @@ main:
     bnez a3, 1b
 .Ldone:
     la   t0, kargs
+    csrr t2, mcycle
+    sub  t2, t2, s1
+    sw   t2, 68(t0)          // cycles
     li   t1, 0x600D
     sw   t1, 64(t0)          // status
     li   a0, 0

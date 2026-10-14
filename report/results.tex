@@ -11,7 +11,11 @@ Gemma 3 1B & FPGA (F2, native kernels) & \emph{run in progress} & --\\
 \newcommand{\fpgatable}{%
 \begin{tabular}{llrrrrr}\toprule
 Model & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\midrule
+FunctionGemma 270M & isl8 & 8 & 16 & 48.7 & 28.0 & 0.0358\\
 FunctionGemma 270M & chat & 16 & 8 & 66.8 & 27.7 & 0.0361\\
+FunctionGemma 270M & isl32 & 32 & 16 & 137.6 & 28.1 & 0.0356\\
+FunctionGemma 270M & isl64 & 64 & 16 & 289.7 & 29.3 & 0.0341\\
+FunctionGemma 270M & isl96 & 96 & 16 & 482.9 & 29.2 & 0.0343\\
 Gemma 3 1B & \emph{runs in progress} & & & & & \\
 \bottomrule\end{tabular}}
 \newcommand{\mlxtable}{%

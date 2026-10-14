@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 232, in <module>
+    main()
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 203, in main
+    h = Harness(be, args.elf)
+        ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 37, in __init__
+    self.image = dev.KernelImage(elf)
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/coralnpu_models/models/host/device.py", line 62, in __init__
+    self.kargs = self.elf.address("kargs")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/coralnpu_models/models/host/f2_device.py", line 347, in address
+    raise KeyError(f"missing symbol {name}")
+KeyError: 'missing symbol kargs'
