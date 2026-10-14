@@ -35,6 +35,13 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# --set/--dump flag parsing shared by the Verilator and ArcSim simulators.
+cc_library(
+    name = "symbol_args",
+    hdrs = ["symbol_args.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "util",
     hdrs = [
@@ -209,6 +216,7 @@ template_rule(
 )
 
 CORE_MINI_AXI_SIM_CC_BINARY_COMMON_DEPS = [
+    ":symbol_args",
     "@com_google_absl//absl/flags:flag",
     "@com_google_absl//absl/flags:parse",
     "@com_google_absl//absl/flags:usage",
@@ -262,6 +270,12 @@ template_rule(
     },
     srcs = [
         "coralnpu/core_mini_axi_sim.cc",
+    ],
+    # The ArcSim differential/perf targets and the Gemma 3 kernel bench run
+    # these simulators.
+    visibility = [
+        "//tests/arcsim_sim:__pkg__",
+        "//tests/perf/gemma3:__pkg__",
     ],
 )
 

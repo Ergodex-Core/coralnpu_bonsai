@@ -17,12 +17,19 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <memory>
+#include <unordered_map>
 
 #include <systemc>
 #include <tlm>
 #include <tlm_utils/simple_target_socket.h>
 
-// "Crossbar" containing a memory and a UART.
+// "Crossbar" containing a memory, a UART and a sparse DDR region.
+//
+//   0x20000000  4 MiB memory (EXTMEM in coralnpu_tcm.ld.tpl), init 0xa5
+//   0x54000000  UART (line buffered to stdout)
+//   0x80000000  2 GiB DDR, allocated on first touch, init 0xa5
 class Xbar : sc_core::sc_module {
  public:
   Xbar(sc_core::sc_module_name name) : sc_core::sc_module(std::move(name)) {
@@ -36,7 +43,9 @@ class Xbar : sc_core::sc_module {
     sc_dt::uint64 addr = trans.get_address();
     unsigned int len = trans.get_data_length();
 
-    if (((addr & kMemoryAddr) == kMemoryAddr) &&
+    if (InDdr(addr, len)) {
+      ddr_b_transport_(trans, delay);
+    } else if (((addr & kMemoryAddr) == kMemoryAddr) &&
         (addr + len < kMemoryAddr + kMemorySizeBytes)) {
       memory_b_transport_(trans, delay);
     } else if (addr == kUartAddr) {
@@ -47,7 +56,65 @@ class Xbar : sc_core::sc_module {
     }
   }
 
+  // Host-side access (no simulated time), e.g. for loading ELF segments
+  // that live in testbench memory and reading results back.
+  bool Contains(uint64_t addr, size_t len) const {
+    return InDdr(addr, len) ||
+           (addr >= kMemoryAddr && addr + len <= kMemoryAddr + kMemorySizeBytes);
+  }
+  bool HostWrite(uint64_t addr, const uint8_t* data, size_t len) {
+    if (!Contains(addr, len)) return false;
+    for (size_t i = 0; i < len; ++i) *HostByte(addr + i) = data[i];
+    return true;
+  }
+  bool HostRead(uint64_t addr, uint8_t* data, size_t len) {
+    if (!Contains(addr, len)) return false;
+    for (size_t i = 0; i < len; ++i) data[i] = *HostByte(addr + i);
+    return true;
+  }
+
  private:
+  static bool InDdr(uint64_t addr, size_t len) {
+    return addr >= kDdrAddr && addr + len <= kDdrAddr + kDdrSizeBytes;
+  }
+
+  uint8_t* HostByte(uint64_t addr) {
+    if (addr >= kDdrAddr) {
+      const uint64_t page = (addr - kDdrAddr) / kDdrPageBytes;
+      auto& p = ddr_pages_[page];
+      if (!p) {
+        p.reset(new uint8_t[kDdrPageBytes]);
+        memset(p.get(), 0xa5, kDdrPageBytes);
+      }
+      return &p[(addr - kDdrAddr) % kDdrPageBytes];
+    }
+    return &memory_[addr - kMemoryAddr];
+  }
+
+  void ddr_b_transport_(tlm::tlm_generic_payload& trans, sc_core::sc_time& delay) {
+    const sc_dt::uint64 addr = trans.get_address();
+    unsigned char* ptr = trans.get_data_ptr();
+    const unsigned int len = trans.get_data_length();
+    unsigned int streaming_width = trans.get_streaming_width();
+    const unsigned char* be = trans.get_byte_enable_ptr();
+    const unsigned int be_len = trans.get_byte_enable_length();
+    if (streaming_width == 0) streaming_width = len;
+    if (!trans.is_read() && !trans.is_write()) {
+      trans.set_response_status(tlm::TLM_GENERIC_ERROR_RESPONSE);
+      return;
+    }
+    for (unsigned int pos = 0; pos < len; ++pos) {
+      if (be_len && be[pos % be_len] != TLM_BYTE_ENABLED) continue;
+      uint8_t* byte = HostByte(addr + (pos % streaming_width));
+      if (trans.is_read()) {
+        ptr[pos] = *byte;
+      } else {
+        *byte = ptr[pos];
+      }
+    }
+    trans.set_response_status(tlm::TLM_OK_RESPONSE);
+  }
+
   void memory_b_transport_(tlm::tlm_generic_payload& trans, sc_core::sc_time& delay) {
     sc_dt::uint64 addr = trans.get_address() & ~kMemoryAddr;
     unsigned char* ptr = trans.get_data_ptr();
@@ -146,6 +213,10 @@ class Xbar : sc_core::sc_module {
   static constexpr uint32_t kMemoryAddr = 0x20000000;
   static constexpr size_t kMemorySizeBytes = 0x400000;
   static constexpr uint32_t kUartAddr = 0x54000000;
+  static constexpr uint64_t kDdrAddr = 0x80000000;
+  static constexpr uint64_t kDdrSizeBytes = 0x80000000;
+  static constexpr uint64_t kDdrPageBytes = 0x10000;
+  std::unordered_map<uint64_t, std::unique_ptr<uint8_t[]>> ddr_pages_;
   uint8_t memory_[kMemorySizeBytes];
   std::vector<char> uart_buffer_;
   tlm_utils::simple_target_socket<Xbar> socket_;

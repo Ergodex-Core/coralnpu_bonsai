@@ -883,6 +883,23 @@ filter_files_by_extension(
     extensions = ["sv"],
 )
 
+# Single self-contained .sv files for simulators that take the emitted RTL
+# directly (ArcSim, see //tests/arcsim_sim).
+[
+    filter_files_by_extension(
+        name = "{}_cc_library_emit_verilog_single_sv".format(core),
+        src = ":{}_cc_library_emit_verilog".format(core),
+        extensions = ["sv"],
+    )
+    for core in [
+        "core_mini_axi",
+        "rvv_core_mini_axi",
+        "rvv_core_mini_highmem_axi",
+        "vme_core_mini_axi",
+        "vme_core_mini_highmem_axi",
+    ]
+]
+
 vcstatic_lint(
     name = "vme_core_mini_axi_cc_library_lint",
     blackbox_designs = CORE_MINI_AXI_BLACKBOX_DESIGNS,

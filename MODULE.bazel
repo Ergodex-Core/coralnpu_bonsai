@@ -96,6 +96,7 @@ use_repo(
     coralnpu_deps_ext,
     "RVVI",
     "abseil-cpp",
+    "arcsim",
     "accellera_systemc",
     "cc_static_library_external",
     "chipsalliance_diplomacy",

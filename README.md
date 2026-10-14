@@ -62,4 +62,8 @@ bazel build //tests/verilator_sim:core_mini_axi_sim
 bazel-bin/tests/verilator_sim/core_mini_axi_sim --binary bazel-out/k8-fastbuild-ST-dd8dc713f32d/bin/examples/coralnpu_v2_hello_world_add_floats.elf
 ```
 
+The same binaries also run on the ArcSim cycle-accurate simulator
+(`//tests/arcsim_sim:*_sim`, Linux x86-64 with a licensed toolchain). See
+[doc/arcsim.md](doc/arcsim.md).
+
 ![](doc/images/Coral_Logo_200px-2x.png)
