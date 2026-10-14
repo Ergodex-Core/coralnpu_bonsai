@@ -122,6 +122,8 @@ object EmitCore extends App {
       p.lsuDataBits = arg.split("=")(1).toInt
       // itcmSizeKBytes, and dtcmSizeKBytes replace highmem flag
       // if highmem is needed, set both tcm sizes to 1024
+    } else if (arg.startsWith("--ebusPrefetchStreams")) {
+      p.ebusPrefetchStreams = arg.split("=")(1).toInt
     } else if (arg.startsWith("--itcmSizeKBytes")) {
       p.itcmSizeKBytes = arg.split("=")(1).toInt
     } else if (arg.startsWith("--dtcmSizeKBytes")) {

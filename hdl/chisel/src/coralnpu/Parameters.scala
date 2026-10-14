@@ -183,6 +183,14 @@ class Parameters(var m: Seq[MemoryRegion] = Seq(), val hartId: Int = 0, var xlen
 
   // [Internal] TCM[Vector,Scalar] interface.
   var axi2IdBits         = 6
+
+  // LSU external-bus read prefetch (DBus2AxiStream). 0 streams keeps the
+  // original one-transaction-at-a-time DBus2AxiV2.
+  var ebusPrefetchStreams = 0
+  var ebusPrefetchDepth   = 16 // rows (bus beats) kept per stream
+  var ebusPrefetchBurst   = 4  // max beats per AXI read burst
+  var ebusPrefetchBursts  = 16 // read bursts in flight
+  var ebusCachedBase      = BigInt("80000000", 16) // prefetch only at/above
   def axi2AddrBits       = xlen
   def axi2DataBits: Int  = { lsuDataBits } // vectorBits
   def axi2DataBytes: Int = { axi2DataBits / 8 }
