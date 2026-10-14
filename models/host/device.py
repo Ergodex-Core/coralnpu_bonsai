@@ -59,7 +59,10 @@ class KernelImage:
     self.path = path
     self.elf = f2_device.ElfImage(path)
     self.entry = self.elf.entry
-    self.kargs = self.elf.address("kargs")
+    # Per-op kernels expose `kargs`; the fused assembly kernel exposes `dargs`.
+    self.kargs = self.elf.symbols.get("kargs", self.elf.symbols.get("dargs", (None, 0)))[0]
+    if self.kargs is None:
+      raise KeyError("kernel has neither kargs nor dargs")
     self.ret = self.elf.symbols.get("_ret", (None, 0))[0]
     self.segments = self.elf.segments
 

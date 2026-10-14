@@ -90,7 +90,9 @@ class GemmaNative:
                 if backend.hbm else self.ddr)
     self.profile = {}
     self.trace = None  # optional callback(stage: str, layer: int | None)
-    self._load_weights(os.path.join(weights_dir, "weights.npz"))
+    self._weights_path = os.path.join(weights_dir, "weights.npz")
+    self.fused = None  # FusedDecoder when the assembly kernel is enabled
+    self._load_weights(self._weights_path)
     self._alloc_buffers()
     self._write_rope_tables()
     self.pos = 0
@@ -132,8 +134,8 @@ class GemmaNative:
         ao=a(MAX_TOKENS * self.D * f32),
         gate_up=a(MAX_TOKENS * 2 * self.H * f32),
         act=a(MAX_TOKENS * self.H * f32),
-        logits=a(self.V * f32),
-        topk=a(64),
+        logits=a(MAX_TOKENS * self.V * f32),  # all rows for speculative verify
+        topk=a(64 * MAX_TOKENS),
         kcache=a(self.L * self.S * self.hd * f32),
         vcache=a(self.L * self.S * self.hd * f32),
     )
@@ -253,6 +255,86 @@ class GemmaNative:
     self.pos += m
     return [int(i) for i in idx], [float(v) for v in val]
 
+  def step_verify(self, tokens):
+    """Runs up to 16 tokens and returns the greedy next token after *each*
+    row (list of ints) plus the per-row top-k. Used by speculative decoding:
+    rows are [last accepted token, draft_1, ..., draft_k]."""
+    m = len(tokens)
+    assert 1 <= m <= MAX_TOKENS and self.pos + m <= self.S
+    b, w = self.b, self.w
+    pos0 = self.pos
+    self.be.write_array(b["tokens"], np.asarray(tokens, dtype=np.uint32))
+    self._launch("embed", m=m, k=self.D, in0=b["tokens"], in1=w["embed.tiles"],
+                 in2=w["embed.scales"], out0=b["x"], f0=math.sqrt(self.D))
+    for i in range(self.L):
+      self._layer(i, m, pos0)
+    self._rmsnorm(b["x"], w["final_norm"], b["xn"], m, self.D)
+    self._quant(b["xn"], m, self.D)
+    self._matvec("embed", m, self.D, self.V, b["logits"], self.V)
+    tops = []
+    for r in range(m):
+      self._launch("topk", n=self.V, in0=b["logits"] + r * self.V * 4,
+                   out0=b["topk"] + r * 64, u0=TOPK)
+    raw = self.be.read(b["topk"], 64 * m)
+    for r in range(m):
+      blk = raw[r * 64:(r + 1) * 64]
+      tops.append(([int(i) for i in np.frombuffer(blk[:32], np.uint32)],
+                   [float(v) for v in np.frombuffer(blk[32:], np.float32)]))
+    self.pos += m
+    return tops
+
+  def speculative_generate(self, prompt_ids, max_tokens, draft, k=7,
+                           stop=(0, 1, 106)):
+    """Greedy speculative decoding. `draft(context_ids, k)` returns up to k
+    proposed next tokens. Returns (generated, step records, prefill seconds)."""
+    self.reset()
+    k = min(k, MAX_TOKENS - 1)
+    steps = []
+    t0 = time.perf_counter()
+    idx = None
+    for start in range(0, len(prompt_ids), MAX_TOKENS):
+      chunk = prompt_ids[start:start + MAX_TOKENS]
+      idx, val = self.step(chunk)
+    prefill = time.perf_counter() - t0
+    generated = [idx[0]]
+    context = list(prompt_ids) + generated
+    while len(generated) < max_tokens and generated[-1] not in stop:
+      base_pos = self.pos
+      last = generated[-1]
+      ts = time.perf_counter()
+      drafts = list(draft(context, k))[:k]
+      draft_s = time.perf_counter() - ts
+      room = min(len(drafts), self.S - self.pos - 1, max_tokens - len(generated) - 1)
+      drafts = drafts[:max(room, 0)]
+      ts = time.perf_counter()
+      tops = self.step_verify([last] + drafts)
+      verify_s = time.perf_counter() - ts
+      targets = [t[0][0] for t in tops]  # argmax after row i
+      accepted = 0
+      new_tokens = []
+      for i, d in enumerate(drafts):
+        if targets[i] == d:
+          accepted += 1
+          new_tokens.append(d)
+        else:
+          break
+      new_tokens.append(targets[accepted])  # correction or bonus token
+      # Roll the cache back to the rows that were actually valid.
+      self.pos = base_pos + 1 + accepted
+      for tok in new_tokens:
+        if len(generated) >= max_tokens:
+          break
+        generated.append(tok)
+        context.append(tok)
+        if tok in stop:
+          break
+      steps.append(dict(pos=base_pos, drafts=len(drafts), accepted=accepted,
+                        emitted=len(new_tokens), draft_seconds=draft_s,
+                        verify_seconds=verify_s, tokens=1 + len(drafts),
+                        token=new_tokens[-1], topk_idx=tops[accepted][0],
+                        topk_val=tops[accepted][1], seconds=draft_s + verify_s))
+    return generated, steps, prefill
+
   def generate(self, prompt_ids, max_tokens, stop=(0, 1, 106)):
     """Greedy decode; returns (generated ids, per-step records)."""
     self.reset()
@@ -274,7 +356,10 @@ class GemmaNative:
       if next_tok in stop or self.pos >= self.S:
         break
       ts = time.perf_counter()
-      idx, val = self.step([next_tok])
+      if self.fused is not None:
+        idx, val = self.fused.step(next_tok)
+      else:
+        idx, val = self.step([next_tok])
       steps.append(dict(pos=self.pos - 1, input=next_tok, token=idx[0],
                         topk_idx=idx, topk_val=val,
                         seconds=time.perf_counter() - ts, tokens=1))

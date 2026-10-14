@@ -34,8 +34,9 @@ FLAGS=(
   -Wl,-T,"${HERE}/kernel.ld"
 )
 
-for src in "${HERE}"/../kernels/*.cc; do
-  name="$(basename "${src}" .cc)"
+for src in "${HERE}"/../kernels/*.cc "${HERE}"/../kernels/*.S "${HERE}"/../asm/*.S; do
+  [[ -e "${src}" ]] || continue
+  name="$(basename "${src}")"; name="${name%.*}"
   elf="${OUT}/${name}.elf"
   "${CLANG}" "${FLAGS[@]}" -Wl,-Map,"${OUT}/${name}.map" \
     "${HERE}/boot.S" "${HERE}/libc_min.c" "${src}" -o "${elf}"

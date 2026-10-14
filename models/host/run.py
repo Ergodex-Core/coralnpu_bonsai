@@ -74,6 +74,12 @@ def main():
   parser.add_argument("--cache-length", type=int, default=128)
   parser.add_argument("--out", default=None)
   parser.add_argument("--verbose", action="store_true")
+  parser.add_argument("--speculative", type=int, default=0, metavar="K",
+                      help="verify up to K draft tokens per NPU step")
+  parser.add_argument("--draft", default="ngram",
+                      help="'ngram' or 'transformers:<model id>' (CPU draft)")
+  parser.add_argument("--fused", default=None, metavar="ELF",
+                      help="use the fused assembly decode kernel (gemma_decode.elf)")
   args = parser.parse_args()
 
   with open(os.path.join(args.weights, "config.json")) as f:
@@ -101,9 +107,16 @@ def main():
     backend = dev.SimBackend(dev._run(mp.MpactNpuSimTestFixture.Create(highmem=False)))
   model = runtime.GemmaNative(backend, args.weights, args.kernels,
                               cache_length=args.cache_length, verbose=args.verbose)
+  if args.fused:
+    from models.host import fused  # pylint: disable=g-import-not-at-top
+    model.fused = fused.FusedDecoder(model, args.fused)
 
   results = []
   stop = () if args.ignore_eos else STOP
+  draft_fn = None
+  if args.speculative:
+    from models.host import draft as D  # pylint: disable=g-import-not-at-top
+    draft_fn = D.make_draft(args.draft)
   for item in prompts:
     if item.get("ids"):
       ids = item["ids"]
@@ -113,8 +126,15 @@ def main():
       if not ids or ids[0] != 2:
         ids = [2] + ids  # <bos>
     label = item.get("label") or item["text"]
-    generated, steps, prefill = model.generate(ids, args.max_tokens, stop)
-    decode = [s["seconds"] for s in steps if s["tokens"] == 1] or [1e-9]
+    if args.speculative:
+      generated, steps, prefill = model.speculative_generate(
+          ids, args.max_tokens, draft_fn, k=args.speculative, stop=stop)
+      decode_tokens = sum(s["emitted"] for s in steps)
+      decode_secs = sum(s["seconds"] for s in steps)
+      decode = [decode_secs / decode_tokens] * decode_tokens if decode_tokens else [1e-9]
+    else:
+      generated, steps, prefill = model.generate(ids, args.max_tokens, stop)
+      decode = [s["seconds"] for s in steps if s["tokens"] == 1] or [1e-9]
     out_text = tok.decode([t for t in generated if t not in STOP])
     results.append(dict(prompt=label, raw=item["raw"], prompt_ids=ids,
                         generated=generated, text=out_text, steps=steps,
@@ -123,12 +143,19 @@ def main():
                         decode_tokens_per_second=len(decode) / sum(decode),
                         total_seconds=prefill + sum(decode)))
     r = results[-1]
+    if args.speculative and steps:
+      acc = sum(s["accepted"] for s in steps) / max(1, sum(s["drafts"] for s in steps))
+      r["speculative"] = dict(k=args.speculative, draft=args.draft, steps=len(steps),
+                              acceptance=acc,
+                              tokens_per_verify=sum(s["emitted"] for s in steps) / len(steps))
+      print(f"  speculative: {len(steps)} verify steps, acceptance {acc:.2f}, "
+            f"{r['speculative']['tokens_per_verify']:.2f} tokens per step")
     print(f"> {label!r}  ISL={r['isl']} OSL={r['osl']}\n{out_text!r}\n"
           f"  TTFT {prefill:.2f}s  decode {r['decode_tokens_per_second']:.4f} tok/s  "
           f"({1 / r['decode_tokens_per_second']:.1f} s/token)  total {r['total_seconds']:.1f}s")
   if args.verbose:
     print(model.profile_report())
-  record = dict(model=cfg["model"], source="native", device=args.backend,
+  record = dict(model=cfg["model"], source=("native-spec" if args.speculative else "native-fused" if args.fused else "native"), device=args.backend,
                 simulator=args.backend, act="int8", cache_length=args.cache_length,
                 results=results)
   if args.out:

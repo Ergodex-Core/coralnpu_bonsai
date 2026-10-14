@@ -1,0 +1,85 @@
+== topk
+  topk: 41352 cycles, 2.4 ms
+  PASS (0.1s)
+== topk_big
+  topk: 1816968 cycles, 75.9 ms
+  PASS (0.1s)
+== matvec_decode
+  matvec_q4: 65980 cycles, 4.2 ms
+Traceback (most recent call last):
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_kernels_test.py", line 233, in main
+    fn(h)
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_kernels_test.py", line 199, in case_matvec_decode
+    np.testing.assert_allclose(got, ref, rtol=1e-4, atol=1e-4)
+  File "/home/ubuntu/venv-models/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1780, in assert_allclose
+    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+  File "/home/ubuntu/venv-models/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Not equal to tolerance rtol=0.0001, atol=0.0001
+
+Mismatched elements: 64 / 64 (100%)
+First 5 mismatches are at indices:
+ [0, 0]: -9.281621932983398 (ACTUAL), -0.7441758513450623 (DESIRED)
+ [0, 1]: -2.0165212154388428 (ACTUAL), 3.1528193950653076 (DESIRED)
+ [0, 2]: 4.941518306732178 (ACTUAL), 2.5330090522766113 (DESIRED)
+ [0, 3]: 7.777838230133057 (ACTUAL), 7.295172214508057 (DESIRED)
+ [0, 4]: 10.67011833190918 (ACTUAL), 4.325568199157715 (DESIRED)
+Max absolute difference among violations: 20.816383
+Max relative difference among violations: 972.43665
+ ACTUAL: array([[ -9.281622,  -2.016521,   4.941518,   7.777838,  10.670118,
+         -3.240007,  -2.814101, -15.521939,   3.206131,   6.96821 ,
+        -13.705594, -13.536196,   4.17726 ,  -4.289238,   5.094632,...
+ DESIRED: array([[-7.441759e-01,  3.152819e+00,  2.533009e+00,  7.295172e+00,
+         4.325568e+00, -8.010559e-01, -1.942957e+00, -4.999379e+00,
+         1.091623e+00,  8.987745e+00,  4.589212e+00, -5.865504e+00,...
+  FAIL
+== quant_act
+  quant_act: 10853 cycles, 0.8 ms
+  PASS (0.0s)
+== rmsnorm
+  rmsnorm: 8632 cycles, 0.8 ms
+  PASS (0.0s)
+== gelu_mul
+  gelu_mul: 34083 cycles, 2.2 ms
+  PASS (0.0s)
+== embed
+  embed: 7203 cycles, 0.8 ms
+  PASS (0.0s)
+== rope
+  rope: 11084 cycles, 0.9 ms
+  PASS (0.0s)
+== attention
+  attention: 27632 cycles, 2.3 ms
+  PASS (0.1s)
+== matvec_q4
+  matvec_q4: 3990 cycles, 0.5 ms
+Traceback (most recent call last):
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_kernels_test.py", line 233, in main
+    fn(h)
+  File "/home/ubuntu/coralnpu_models/models/tests/fpga_kernels_test.py", line 115, in case_matvec_q4
+    np.testing.assert_allclose(got, ref, rtol=1e-4, atol=1e-4)
+  File "/home/ubuntu/venv-models/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1780, in assert_allclose
+    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+  File "/home/ubuntu/venv-models/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Not equal to tolerance rtol=0.0001, atol=0.0001
+
+Mismatched elements: 96 / 96 (100%)
+First 5 mismatches are at indices:
+ [0, 0]: 1.1088354587554932 (ACTUAL), 0.7800546288490295 (DESIRED)
+ [0, 1]: -0.9976633787155151 (ACTUAL), -0.3646453022956848 (DESIRED)
+ [0, 2]: -0.4285455346107483 (ACTUAL), 0.23304812610149384 (DESIRED)
+ [0, 3]: -0.33310818672180176 (ACTUAL), -0.5015666484832764 (DESIRED)
+ [0, 4]: -1.106467604637146 (ACTUAL), 0.6742528676986694 (DESIRED)
+Max absolute difference among violations: 4.529152
+Max relative difference among violations: 54.056812
+ ACTUAL: array([[ 1.108835, -0.997663, -0.428546, -0.333108, -1.106468,  0.405088,
+        -0.507524,  1.510369,  0.870405,  1.161587, -1.27205 ,  0.990389,
+         0.545463, -0.227025, -0.899695, -0.336948, -1.070382,  1.198346,...
+ DESIRED: array([[ 0.780055, -0.364645,  0.233048, -0.501567,  0.674253, -0.834214,
+        -0.528189, -0.068652, -1.043311, -1.16806 , -0.550416, -0.047787,
+        -0.231578,  0.018589,  0.725277,  1.32316 , -0.670288, -0.613412,...
+  FAIL
+failed: ['matvec_decode', 'matvec_q4']

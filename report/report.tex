@@ -19,15 +19,19 @@
 \maketitle
 
 \section{Summary}
-Both models now run end to end on Alex's F2 image (\texttt{agfi-075a98d106eb1b6bf}, small shell
+Both models run end to end on Alex's F2 image (\texttt{agfi-075a98d106eb1b6bf}, small shell
 \texttt{0x10212415}) using hand-written CoralNPU kernels under \texttt{models/}. On the FPGA,
-FunctionGemma 270M generates \emph{token-identical} output to the MLX bf16 reference for the
-chat prompt used throughout this report. Throughput on the image is bound by external memory:
-the core streams about 0.7~bytes per cycle at 25~MHz, so a FunctionGemma decode step takes about
-28~s and a Gemma 3 1B step is expected to take 50--60~s. Table~\ref{tab:fpga} lists the measured
-time to first token (TTFT) and tokens per second for the prompt lengths run so far; runs still in
-progress are marked and the report is regenerated from the result files
-(\texttt{report/collect.py}).
+FunctionGemma 270M generates \emph{token-identical} output to the MLX bf16 reference for the chat
+prompt used throughout this report, and Gemma 3 1B generates exactly the tokens of the NumPy
+reference that reproduces the device's Q4\_0/int8 arithmetic. Throughput on the image is bound by
+external memory: the core streams about 0.7~bytes per cycle at 25~MHz for every load form.
+Two kernel generations are reported: the per-operator kernels (one launch per operator), and a
+\emph{fused} single-token decode kernel written in assembly (one launch per generated token,
+activations and scales kept in DTCM, f16 scales, logits never written out). The fused kernel
+cuts FunctionGemma decode from 27.7 to 11.6~s per token with identical output; Gemma 3 1B
+decode from 72.6 to 41.4~s per token, again with identical tokens. Table~\ref{tab:fpga} lists the
+measured time to first token (TTFT) and tokens per second; the report is regenerated from the
+result files (\texttt{report/collect.py}).
 
 \section{Setup}
 \begin{description}
@@ -93,6 +97,25 @@ activation load per 16 K values, two weight loads and a scale load per 32-wide g
 that floor. In the first FunctionGemma run, 637 matvec launches accounted for 120~s of the 235~s
 total; the scalar GELU kernel for 12~s.
 
+\subsection{Fused decode kernel}
+\texttt{models/asm/gemma\_decode.S} is a whole single-token decode step in 3.9~KB of assembly:
+embedding gather, all layers, final norm and the tied-embedding logits with a fused top-8 drain.
+Int8 activations and their per-group scales live in DTCM, Q4\_0 scales are stored as f16 and
+converted on-chip, softmax and GELU use a vectorized exp, and nothing intermediate is written
+to HBM. Every routine passes against the NumPy references on the FPGA
+(\texttt{models/tests/fpga\_fused\_test.py}), and a full fused step returns exactly the top-4
+tokens and logit values of the per-operator runtime. For FunctionGemma the step takes 276M cycles
+(11.1~s), against about 28~s for the per-operator sequence; the remaining time is the weight
+stream itself. Prefill still uses the per-operator kernels (16 tokens per pass), so TTFT is
+unchanged; a fused multi-row prefill variant is the next step.
+
+\paragraph{What did not help.} (1) Matrix-engine tile loads: a \texttt{vtle8} moves one 16-byte
+slice per instruction, so the bus cost is identical to a vector load (an earlier 16$\times$
+reading was a benchmark artifact, corrected in \texttt{models/tests/tilebench.py}).
+(2) Speculative decoding with a 270M CPU draft against the 1B target: output identical to greedy,
+50\% acceptance, 2.3 tokens per verification step, but each extra verified row cost about 26~s
+on the per-operator path, so the net gain was 72.6 to 66.6~s per token; set aside.
+
 \subsection{MLX on Apple Silicon}
 \begin{table}[H]\centering\footnotesize
 \mlxtable
@@ -123,13 +146,16 @@ intended tool for a tighter estimate and has not been run yet.
     (262{,}144 logits in 1.8M cycles, 73~ms).
   \item \textbf{Matrix engine.} The int8 \texttt{vtmms} path with four K values per instruction
     works as documented in the repository's VME tests; the signed-by-unsigned mode consumes raw
-    Q4\_0 nibbles directly.
+    Q4\_0 nibbles directly. Tile loads and stores move one 16-byte slice per instruction.
 \end{itemize}
 
 \section{Next steps}
 \begin{enumerate}
-  \item Finish the ISL/OSL sweeps for both models (in progress on the instance) and refresh this
+  \item Finish the Gemma 3 1B fused run and single-stream sweeps (in progress) and refresh this
     report and pull request~\#10.
+  \item Fused multi-row prefill (chunking the activation block through DTCM) to cut TTFT the
+    way the fused decode kernel cut decode; move the vocabulary projection to the host CPU for the
+    270M models (150~MB of the 215~MB streamed per token).
   \item Build the coralnpu-compiler path on the instance and compare its F2 backend against the
     native kernels on the same prompts; run MPACT for the 1~GHz estimate.
   \item Reduce weight traffic further: f16 group scales (halves scale reads), fusing the gated
