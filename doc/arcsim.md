@@ -118,6 +118,56 @@ utils/arcsim/run_perf.sh --runs 3 --cpu 3
 The script never uses sudo. It reports any missing packages and writes results
 to `perf-results/<timestamp>/`.
 
+## Gemma 3 kernel bench
+
+`//tests/perf/gemma3` estimates how fast the RVV Gemma kernels in
+`tests/cocotb/rvv/ml_ops/gemma_kernels` would run at 25 MHz and 1 GHz. It uses
+the layer shapes of a Gemma 3 270M single-token decode step on the highmem RVV
+core.
+
+```sh
+bazel run //tests/perf/gemma3:gemma3_kernel_bench_verilator       # Verilator only
+bazel run --config=arcsim //tests/perf/gemma3:gemma3_kernel_bench # both simulators
+bazel run --config=arcsim //tests/perf/gemma3:gemma3_kernel_bench_arcsim -- \
+  --kv_len=512 --freq_mhz=25,250,1000 --json=/tmp/gemma3.json
+```
+
+Each kernel runner times itself with `mcycle` and stores the result in a
+`cycle_count` variable. The simulators set the shape variables with `--set`
+and print `cycle_count` with `--dump`, so ELF loading is not counted. The
+report has three parts:
+
+- **Per-kernel table:** cycles on each simulator, the difference between them,
+  latency at each clock, MAC/cycle, GMAC/s, and simulator wall time.
+- **Per-layer and per-token decode estimates:** for fp32, bf16 and int8
+  matmuls. These include tokens per second at each clock.
+- **LM head:** the 640×262144 LM head is counted as 256 tiles. Use
+  `--no_lm_head` to leave it out.
+
+The estimates rest on these assumptions:
+
+- **Tiling.** Matmuls larger than the runners' buffers run as tiles that fit,
+  multiplied by the tile count. Accumulating partial sums between tiles is not
+  included.
+- **Input data.** Inputs keep their ELF initial values. The kernels' control
+  flow depends only on shape, so this doesn't change the cycle count.
+- **Memory latency.** Testbench memory, including DDR at `0x80000000`,
+  responds in one cycle. Memory-bound kernels will be slower against real DDR.
+
+### `--set` and `--dump`
+
+Both the Verilator and ArcSim AXI simulators accept these flags:
+
+```sh
+rvv_core_mini_highmem_axi_sim --binary=rvv_matmul.elf \
+  --set=active_m=1,active_k=640,active_n=1024 --dump=cycle_count
+# ...
+# SYMBOL cycle_count=123456
+```
+
+Values are 32-bit integers, in decimal or `0x` hex, or `f32:<float>` for
+float variables.
+
 ## CI on Blacksmith
 
 `.github/workflows/sim-blacksmith.yml` runs on Blacksmith runners
