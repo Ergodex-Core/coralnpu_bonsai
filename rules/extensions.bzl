@@ -14,6 +14,7 @@
 
 """Module extension for coralnpu dependencies."""
 
+load("//rules:arcsim_repo.bzl", "arcsim_repo")
 load("//rules:host_cpus.bzl", "host_cpus")
 load(
     "//rules:repo_defs.bzl",
@@ -34,6 +35,7 @@ load("//third_party/python:requirements.bzl", "install_deps")
 def _coralnpu_deps_ext_impl(_ctx):
     # Call non-conflicting legacy repo definitions
     host_cpus(name = "coralnpu_host_cpus")
+    arcsim_repo(name = "arcsim")
     cvfpu_repos()
     rvvi_repos()
     verilator_repos()
