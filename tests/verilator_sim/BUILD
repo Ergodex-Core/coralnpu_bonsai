@@ -263,6 +263,8 @@ template_rule(
     srcs = [
         "coralnpu/core_mini_axi_sim.cc",
     ],
+    # The ArcSim differential and perf targets run these simulators.
+    visibility = ["//tests/arcsim_sim:__pkg__"],
 )
 
 cc_test(

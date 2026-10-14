@@ -32,13 +32,16 @@ load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 _TRIPLE = "x86_64-unknown-linux-gnu"
 
 def verilator_vopts_to_arcsim_frontend_args(vopts):
-    """Keeps the -D/-I options from a Verilator vopts list.
+    """Keeps the -D options from a Verilator vopts list.
 
     Verilator-only flags such as -Wno-* are dropped. This lets arcsim targets
     reuse the vopts lists in hdl/chisel/src/coralnpu/flags.bzl so the two
-    simulators always see the same defines and include paths.
+    simulators always see the same defines. -I options are dropped too:
+    Verilator ignores missing include directories but circt-verilog rejects
+    them, and the shared lists name directories that do not exist in this
+    tree. Pass real include directories through frontend_args/hdrs instead.
     """
-    return [o for o in vopts if o.startswith("-D") or o.startswith("-I")]
+    return [o for o in vopts if o.startswith("-D")]
 
 def _arcsim_model_impl(ctx):
     top = ctx.attr.top
