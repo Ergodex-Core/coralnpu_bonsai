@@ -1,0 +1,9 @@
+[Unit]
+Description=Aggregate CoralNPU CI workload and private engine resource cap
+StopWhenUnneeded=no
+
+[Slice]
+CPUQuota=1600%
+MemoryMax=68719476736
+MemorySwapMax=0
+TasksMax=4096

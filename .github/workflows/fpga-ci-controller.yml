@@ -1,0 +1,75 @@
+# Disabled until protected-main setup and target-host controls are qualified.
+# Source workflow handles explicit source-only/direct/SSM readiness routing.
+# No private host/account configuration belongs in public workflow source.
+name: CoralNPU trusted F2 orchestration
+on:
+  workflow_run:
+    workflows: [AWS F2 FPGA PR build]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Existing source-check run ID; exact PR identity is resolved through GitHub
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: coralnpu-existing-f2-pilot
+  cancel-in-progress: false
+  queue: max
+jobs:
+  controller:
+    if: github.ref == 'refs/heads/main' && vars.FPGA_CI_BACKEND == 'ssm' && vars.FPGA_SSM_ENABLED == 'true'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 375
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Load approved operator configuration
+        env:
+          FPGA_CI_BACKEND: ${{ vars.FPGA_CI_BACKEND }}
+          FPGA_CI_CONFIG_JSON: ${{ vars.FPGA_CI_CONFIG_JSON }}
+        run: python3 fpga/aws/ci/orchestrator/configure.py
+      - name: Require a reviewed enabled activation configuration
+        run: python3 fpga/aws/ci/validate_bundle.py --activation
+      - name: Install hash-pinned controller SDK in an isolated environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/coralnpu-sdk"
+          "$RUNNER_TEMP/coralnpu-sdk/bin/python" -m pip --isolated --disable-pip-version-check install --require-hashes --only-binary=:all: --no-deps -r fpga/aws/ci/requirements-controller.lock
+      - name: Resolve source run, current PR and exact-SHA eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id || inputs.source_run_id }}
+        run: python3 fpga/aws/ci/orchestrator/resolve_request.py
+      - name: Submit the pinned document and collect bounded artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/coralnpu-sdk/bin/python" fpga/aws/ci/orchestrator/controller.py'
+      - name: Publish qualified checkpoint only after successful controller receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fpga-qualified-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/coralnpu-artifacts/checkpoint.tar
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Publish bounded evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fpga-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/coralnpu-artifacts/evidence.tar
+            ${{ runner.temp }}/coralnpu-artifacts/receipt.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Install root-owned and non-writable at this fixed SSM document entry point.
+# No positional overrides are accepted by the fixed submit phase.
+exec /opt/coralnpu-ci/venv/bin/python -I /usr/local/libexec/coralnpu-ci/entrypoint.py submit "$@"

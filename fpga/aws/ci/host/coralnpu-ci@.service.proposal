@@ -1,0 +1,25 @@
+[Unit]
+Description=Bounded CoralNPU CI request %i
+After=coralnpu-ci-docker.service coralnpu-ci-containerd.service
+Requires=coralnpu-ci-docker.service coralnpu-ci-containerd.service
+
+[Service]
+Type=exec
+User=root
+Group=root
+UMask=0077
+Slice=coralnpu-ci.slice
+ExecStart=/opt/coralnpu-ci/venv/bin/python -I /usr/local/libexec/coralnpu-ci/entrypoint.py launch %i
+ExecStopPost=/opt/coralnpu-ci/venv/bin/python -I /usr/local/libexec/coralnpu-ci/entrypoint.py cleanup %i
+RuntimeMaxSec=21600
+TimeoutStopSec=15
+KillMode=control-group
+SendSIGKILL=yes
+Restart=no
+StandardOutput=null
+StandardError=null
+
+# Deployment requires the reviewed private engine/storage/network setup.
+# The independent watchdog runs outside coralnpu-ci.slice, retains the shared
+# lock, and directly freezes/kills the pinned per-run payload at its BOOTTIME
+# deadline. RuntimeMaxSec alone is not the workload deadline boundary.
