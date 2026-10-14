@@ -1,0 +1,20 @@
+PERF {"op": "matvec_k1152_t2", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152, "n": 32}, "cycles": 20174, "read_latency": 100}
+PERF {"op": "matvec_k1152_t4", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152, "n": 64}, "cycles": 40165, "read_latency": 100}
+PERF {"op": "matvec_k1024_t2", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 1024, "n": 32}, "cycles": 18150, "read_latency": 100}
+PERF {"op": "matvec_k1024_t4", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 1024, "n": 64}, "cycles": 36117, "read_latency": 100}
+PERF {"op": "matvec_k6912_t2", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 6912, "n": 32}, "cycles": 111254, "read_latency": 100}
+PERF {"op": "matvec_k6912_t4", "kernel": "matvec_q4", "model": "gemma3-1b", "m": 1, "shape": {"k": 6912, "n": 64}, "cycles": 222325, "read_latency": 100}
+PERF {"op": "rmsnorm_dim", "kernel": "rmsnorm", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152}, "cycles": 36315, "read_latency": 100}
+PERF {"op": "rmsnorm_dim_residual", "kernel": "rmsnorm", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152}, "cycles": 38062, "read_latency": 100}
+PERF {"op": "rmsnorm_q_norm", "kernel": "rmsnorm", "model": "gemma3-1b", "m": 4, "shape": {"k": 256}, "cycles": 32814, "read_latency": 100}
+PERF {"op": "rmsnorm_k_norm", "kernel": "rmsnorm", "model": "gemma3-1b", "m": 1, "shape": {"k": 256}, "cycles": 8400, "read_latency": 100}
+PERF {"op": "rmsnorm_final", "kernel": "rmsnorm", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152}, "cycles": 36316, "read_latency": 100}
+PERF {"op": "quant_dim", "kernel": "quant_act", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152}, "cycles": 143830, "read_latency": 100}
+PERF {"op": "quant_attn", "kernel": "quant_act", "model": "gemma3-1b", "m": 1, "shape": {"k": 1024}, "cycles": 127868, "read_latency": 100}
+PERF {"op": "quant_hidden", "kernel": "quant_act", "model": "gemma3-1b", "m": 1, "shape": {"k": 6912}, "cycles": 862029, "read_latency": 100}
+PERF {"op": "quant_final", "kernel": "quant_act", "model": "gemma3-1b", "m": 1, "shape": {"k": 1152}, "cycles": 143830, "read_latency": 100}
+PERF {"op": "gelu_mul", "kernel": "gelu_mul", "model": "gemma3-1b", "m": 1, "shape": {"k": 6912}, "cycles": 1693497, "read_latency": 100}
+PERF {"op": "rope_q", "kernel": "rope", "model": "gemma3-1b", "m": 1, "shape": {"pos": 127}, "cycles": 36024, "read_latency": 100}
+PERF {"op": "rope_kv", "kernel": "rope", "model": "gemma3-1b", "m": 1, "shape": {"pos": 127}, "cycles": 66051, "read_latency": 100}
+PERF {"op": "attention", "kernel": "attention", "model": "gemma3-1b", "m": 1, "shape": {"pos": 127}, "cycles": 985295, "read_latency": 100}
+PERF {"op": "topk_32k", "kernel": "topk", "model": "gemma3-1b", "m": 1, "shape": {"n": 32768}, "cycles": 194481, "read_latency": 100}
