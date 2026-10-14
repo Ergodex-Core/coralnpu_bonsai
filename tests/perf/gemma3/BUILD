@@ -61,6 +61,19 @@ py_binary(
     main = "gemma3_kernel_bench.py",
 )
 
+# Verilator with the F2-calibrated external-memory latency (doc/arcsim.md).
+py_binary(
+    name = "gemma3_kernel_bench_verilator_f2",
+    srcs = ["gemma3_kernel_bench.py"],
+    args = [
+        "--verilator=$(rootpath {})".format(_VERILATOR_SIM),
+        "--axi_read_latency=18",
+        "--axi_write_latency=18",
+    ] + _ELF_ARGS,
+    data = [_VERILATOR_SIM] + _ELFS,
+    main = "gemma3_kernel_bench.py",
+)
+
 # Verilator and ArcSim side by side (cycle agreement and simulator speed).
 py_binary(
     name = "gemma3_kernel_bench",
