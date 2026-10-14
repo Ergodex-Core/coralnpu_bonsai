@@ -309,7 +309,11 @@ void CoreMiniAxi_tb::Connect() {
 absl::Status CoreMiniAxi_tb::LoadElfSync(const std::string& file_name) {
   CHECK_OK(LoadElfAsync(file_name));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -402,7 +406,11 @@ absl::Status CoreMiniAxi_tb::LoadElfAsync(const std::string& file_name) {
 absl::Status CoreMiniAxi_tb::ClockGateSync(bool enable) {
   CHECK_OK(ClockGateAsync(enable));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -421,7 +429,11 @@ absl::Status CoreMiniAxi_tb::ClockGateAsync(bool enable) {
 absl::Status CoreMiniAxi_tb::ResetSync(bool enable) {
   CHECK_OK(ResetAsync(enable));
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -440,7 +452,11 @@ absl::Status CoreMiniAxi_tb::ResetAsync(bool enable) {
 absl::Status CoreMiniAxi_tb::CheckStatusSync() {
   CHECK_OK(CheckStatusAsync());
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
   return absl::OkStatus();
 }
 
@@ -918,7 +934,11 @@ void CoreMiniAxi_tb::EnqueueTransactionSync(
     std::vector<DataTransfer> transfers) {
   EnqueueTransactionAsync(transfers);
   absl::MutexLock lock(&transfer_queue_mtx_);
-  transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  // Wait for the queue to drain rather than for a single signal: the
+  // traffic generator may finish (and signal) before we start waiting.
+  while (!transfer_queue_.empty()) {
+    transfer_queue_cv_.Wait(&transfer_queue_mtx_);
+  }
 }
 
 void CoreMiniAxi_tb::EnqueueTransactionAsync(
