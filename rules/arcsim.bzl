@@ -70,6 +70,10 @@ def _arcsim_model_impl(ctx):
     # 1. SystemVerilog -> HW MLIR.
     frontend = ctx.actions.args()
     frontend.add_all([
+        # --Osim imports procedural blocks in the form arcilator schedules;
+        # without it the RVV/VME cores fail lowering with a false
+        # "loop splitting did not eliminate all loops" error.
+        "--Osim",
         "--ir-hw",
         "--single-unit",
         "--timescale=1ps/1ps",
