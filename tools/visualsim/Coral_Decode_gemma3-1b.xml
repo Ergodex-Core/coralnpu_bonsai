@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='utf-8'?>
+<entity name="Coral_Decode_gemma3_1b" class="VisualSim.actor.TypedCompositeActor">
+  <property name="SDF" class="VisualSim.simulators.sdf.kernel.SDFDirector">
+    <property name="iterations" value="20" class="VisualSim.data.expr.Parameter" />
+  </property>
+  <property name="Latency" value="24.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Core_Prefetch" value="true" class="VisualSim.data.expr.Parameter" />
+  <property name="Posted_Writes" value="false" class="VisualSim.data.expr.Parameter" />
+  <property name="Stream_Depth" value="16.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Matvec_Compute_Scale" value="1.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Delta" value="3.7222" class="VisualSim.data.expr.Parameter" />
+  <property name="LSU_Row_Cycles" value="4.0" class="VisualSim.data.expr.Parameter" />
+  <property name="LSU_Overhead" value="10.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Clock_MHz" value="25.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Other_base_At24" value="78505743.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Other_base_Slope" value="2564324.000" class="VisualSim.data.expr.Parameter" />
+  <property name="Other_pf_At24" value="10837307.0" class="VisualSim.data.expr.Parameter" />
+  <property name="Other_pf_Slope" value="195146.842" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_Names" value="{&quot;f_matvec_k1152_tile&quot;,&quot;f_matvec_k1152_call&quot;,&quot;f_matvec_k1152_tile&quot;,&quot;f_matvec_k1152_call&quot;,&quot;f_matvec_k1024_tile&quot;,&quot;f_matvec_k1024_call&quot;,&quot;f_matvec_k1152_tile&quot;,&quot;f_matvec_k1152_call&quot;,&quot;f_matvec_k6912_tile&quot;,&quot;f_matvec_k6912_call&quot;,&quot;f_logits_tile&quot;,&quot;f_logits_call&quot;,&quot;f_rmsnorm_dim&quot;,&quot;f_rmsnorm_dim_residual&quot;,&quot;f_rmsnorm_hd&quot;,&quot;f_quant_dim&quot;,&quot;f_quant_attn&quot;,&quot;f_quant_hidden&quot;,&quot;f_rope_hd&quot;,&quot;f_gelu&quot;}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_A" value="{7993.0000,-603.0000,7993.0000,-603.0000,7109.0000,-524.0000,7993.0000,-603.0000,47773.0000,-3582.0000,8057.0000,-607.0000,6370.0000,7858.0000,1386.0000,9687.0000,8608.0000,57666.0000,1204.0000,77595.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_R" value="{648.0000,0.0000,648.0000,0.0000,576.0000,0.0000,648.0000,0.0000,3888.0000,0.0000,648.0000,0.0000,864.0000,1152.0000,192.0000,288.0000,256.0000,1728.0000,128.0000,5184.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_W" value="{4.0000,-90.0000,4.0000,-90.0000,4.0000,-80.0000,4.0000,-90.0000,4.0000,-540.0000,0.0000,-90.0000,288.0000,288.0000,64.0000,90.0000,80.0000,540.0000,64.0000,1728.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_S" value="{0.0000,-1.0000,0.0000,-1.0000,0.0000,-1.0000,0.0000,-1.0000,0.0000,-1.0000,0.0000,-1.0000,3.0000,3.0000,3.0000,4.0000,4.0000,4.0000,3.0000,3.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_RowsPerLoad" value="{1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,1.0000,8.0000,8.0000,8.0000,8.0000,8.0000,8.0000,4.0000,8.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_Count" value="{1664.0000,26.0000,832.0000,26.0000,1872.0000,26.0000,22464.0000,26.0000,1872.0000,26.0000,16384.0000,1.0000,53.0000,52.0000,130.0000,53.0000,26.0000,26.0000,130.0000,26.0000}" class="VisualSim.data.expr.Parameter" />
+  <property name="Row_IsMatvecTile" value="{true,false,true,false,true,false,true,false,true,false,true,false,false,false,false,false,false,false,false,false}" class="VisualSim.data.expr.Parameter" />
+  <entity name="Row_Index" class="VisualSim.actor.lib.Ramp">
+    <property name="init" value="0" class="VisualSim.data.expr.Parameter" />
+  </entity>
+  <entity name="Row_Cycles" class="VisualSim.actor.lib.Expression">
+    <property name="expression" value="{row=Row_Names(i), count=Row_Count(i), cycles=(Core_Prefetch ? max((Row_IsMatvecTile(i) ? Row_A(i)/Matvec_Compute_Scale : Row_A(i)) + (Row_R(i)/Row_RowsPerLoad(i))*Delta + Row_W(i)*(Posted_Writes ? Delta : Latency) + Row_S(i)*Latency, Row_R(i)*16.0/min(16.0/LSU_Row_Cycles, Stream_Depth*16.0/(Latency+LSU_Overhead))) : (Row_IsMatvecTile(i) ? Row_A(i)/Matvec_Compute_Scale : Row_A(i)) + (Row_R(i)+Row_W(i))*Latency), cycles_per_token=Row_Count(i)*(Core_Prefetch ? max((Row_IsMatvecTile(i) ? Row_A(i)/Matvec_Compute_Scale : Row_A(i)) + (Row_R(i)/Row_RowsPerLoad(i))*Delta + Row_W(i)*(Posted_Writes ? Delta : Latency) + Row_S(i)*Latency, Row_R(i)*16.0/min(16.0/LSU_Row_Cycles, Stream_Depth*16.0/(Latency+LSU_Overhead))) : (Row_IsMatvecTile(i) ? Row_A(i)/Matvec_Compute_Scale : Row_A(i)) + (Row_R(i)+Row_W(i))*Latency)}" class="VisualSim.kernel.util.StringAttribute" />
+    <port name="i" class="VisualSim.actor.TypedIOPort">
+      <property name="input" />
+    </port>
+  </entity>
+  <entity name="Row_Records" class="VisualSim.actor.lib.io.ExpressionWriter">
+    <property name="fileName" value="results/token-rows.txt" class="VisualSim.data.expr.FileParameter" />
+    <property name="append" value="false" class="VisualSim.data.expr.Parameter" />
+    <property name="confirmOverwrite" value="false" class="VisualSim.data.expr.Parameter" />
+  </entity>
+  <relation name="r0" class="VisualSim.actor.TypedIORelation" />
+  <link port="Row_Index.output" relation="r0" />
+  <link port="Row_Cycles.i" relation="r0" />
+  <relation name="r1" class="VisualSim.actor.TypedIORelation" />
+  <link port="Row_Cycles.output" relation="r1" />
+  <link port="Row_Records.input" relation="r1" />
+</entity>
