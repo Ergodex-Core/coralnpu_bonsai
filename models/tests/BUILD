@@ -56,6 +56,7 @@ PERF_TESTCASES = [
     "test_perf_elementwise",
     "test_perf_attention",
     "test_perf_topk",
+    "test_perf_membench",
 ]
 
 FUSED_PERF_TESTCASES = [
@@ -64,6 +65,13 @@ FUSED_PERF_TESTCASES = [
     "test_fused_matvec_down",
     "test_fused_elementwise",
     "test_fused_attention",
+]
+
+BENCH_TESTCASES = [
+    "test_bench_layer0",
+    "test_bench_layers01",
+    "test_bench_layers01_global",
+    "test_bench_layer0_vocab512",
 ]
 
 # Each suite runs on the baseline core and on the core with the LSU read
@@ -97,6 +105,7 @@ FUSED_PERF_TESTCASES = [
         ("kernels_cocotb_test", KERNEL_TESTCASES, "KERNEL_TESTCASES"),
         ("kernels_perf_cocotb_test", PERF_TESTCASES, "PERF_TESTCASES"),
         ("kernels_fused_perf_cocotb_test", FUSED_PERF_TESTCASES, "FUSED_PERF_TESTCASES"),
+        ("model_bench_cocotb_test", BENCH_TESTCASES, "BENCH_TESTCASES"),
     ]
     for suffix, toplevel, model in [
         ("", "VmeCoreMiniAxi", "//tests/cocotb:vme_core_mini_axi_model"),

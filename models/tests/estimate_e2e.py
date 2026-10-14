@@ -32,6 +32,8 @@ import argparse
 import json
 import os
 
+import numpy as np
+
 from models.host import weights as W
 from models.tests import fused_perf_ops
 
@@ -75,16 +77,53 @@ def token(model, ops, m):
   return out
 
 
+STAGES = ["embed", "attn norm+quant", "q/kv matvec", "qk norm+rope+cache", "attention",
+          "o proj", "ffw norm+quant", "gate_up", "gelu+quant", "down", "post-ffw norm",
+          "final norm+quant", "logits+top8"]
+
+
+def bench_token(path):
+  """Token from model_bench_cocotb_test runs (`BENCH {json}` lines): exact
+  per-layer costs from layer-subset differences, logits per vocab row from two
+  vocab sizes. Returns (model, {stage: cycles}, checks)."""
+  runs = {}
+  for line in open(path):
+    if line.startswith("BENCH "):
+      d = json.loads(line[6:])
+      runs[(tuple(d["layers"]), d["vocab"])] = d
+  model = next(iter(runs.values()))["model"]
+  c = W.MODELS[model]
+  pattern = [c["pattern"][i % len(c["pattern"])] for i in range(c["layers"])]
+  n_global = pattern.count("global")
+  g = c["pattern"].index("global")
+  st = lambda k: np.array(runs[k]["stages"], np.float64)
+  one, two, three = st(((0,), 256)), st(((0, 1), 256)), st(((0, 1, g), 256))
+  v512 = st(((0,), 512))
+  local, glob = two - one, three - two
+  per_row = (v512 - one) / 256
+  token = (one - local) + (c["layers"] - n_global) * local + n_global * glob + per_row * (c["vocab"] - 256)
+  checks = {f"{k[0]}@{k[1]}": (r["top1_match"], r["top8_overlap"], round(r["x_rel_err"], 5))
+            for k, r in runs.items()}
+  return model, dict(zip(STAGES, token)), checks
+
+
 def main():
   ap = argparse.ArgumentParser()
   ap.add_argument("files", nargs="+")
   ap.add_argument("--mhz", default="25,1000")
+  ap.add_argument("--bench", action="store_true",
+                  help="inputs are model_bench_cocotb_test runs (BENCH lines)")
   ap.add_argument("--fused", action="store_true",
                   help="inputs are fused-kernel routine timings (fused_perf_ops)")
   args = ap.parse_args()
   mhz = [float(x) for x in args.mhz.split(",")]
   rows = []
   for path in args.files:
+    if args.bench:
+      model, stages, checks = bench_token(path)
+      print(f"{path}: correctness (top1, top8 overlap, x rel err) {checks}")
+      rows.append((os.path.basename(path).replace(".jsonl", ""), 1, stages, sum(stages.values())))
+      continue
     model, ops = load(path)
     if args.fused:
       m, stages = 1, fused_perf_ops.compose(model, {op: c for (op, _), c in ops.items()})

@@ -139,6 +139,23 @@ async def test_perf_attention(dut):
 
 
 @cocotb.test()
+async def test_perf_membench(dut):
+  """Raw external read/write bandwidth: 64 KiB streamed with 16..128-byte
+  vector loads/stores. B/cycle = bytes / cycles (memory-path target: >= 2.8)."""
+  h = await setup(dut)
+  n = 64 << 10
+  src, dst = await h.put(np.zeros(n, np.uint8)), h.alloc(n)
+  for chunk in (16, 128):
+    for write in (0, 1):
+      cycles = await h.launch("membench", n=n, in0=src, out0=dst, u0=chunk, flags=write)
+      print("PERF " + json.dumps(dict(
+          op=f"membench_{'write' if write else 'read'}_{chunk}", kernel="membench", model=MODEL,
+          m=1, shape=dict(n=n, chunk=chunk), cycles=int(cycles),
+          bytes_per_cycle=round(n / int(cycles), 3),
+          read_latency=int(os.environ.get("AXI_READ_LATENCY", "0")))), flush=True)
+
+
+@cocotb.test()
 async def test_perf_topk(dut):
   """32k logits; the scan is linear, so estimate_e2e scales it to the vocab."""
   h = await setup(dut)
