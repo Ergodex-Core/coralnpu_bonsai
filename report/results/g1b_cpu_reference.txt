@@ -1,0 +1,15 @@
+/home/ubuntu/coralnpu_models/models/tests/reference.py:108: RuntimeWarning: invalid value encountered in divide
+  nib = np.rint(w / np.repeat(sc.transpose(0, 2, 1).reshape(n, groups), GROUP, axis=1)).astype(np.int32) + 8
+/home/ubuntu/coralnpu_models/models/tests/reference.py:108: RuntimeWarning: invalid value encountered in cast
+  nib = np.rint(w / np.repeat(sc.transpose(0, 2, 1).reshape(n, groups), GROUP, axis=1)).astype(np.int32) + 8
+prefill 16 tokens in 13s; first token 818
+  token 2: 5279 (8s)
+  token 3: 529 (8s)
+  token 4: 7001 (8s)
+  token 5: 691 (8s)
+  token 6: 9079 (8s)
+  token 7: 1913 (8s)
+  token 8: 506 (8s)
+reference: [818, 5279, 529, 7001, 691, 9079, 1913, 506]
+device:    [818, 5279, 529, 7001, 691, 9079, 1913, 506]
+match: True

@@ -4,19 +4,25 @@
 \begin{tabular}{lp{3.6cm}p{4.6cm}l}\toprule
 Model & Backend & Generated text & Tokens match MLX\\\midrule
 FunctionGemma 270M & MLX functiongemma-270m-it-bf16 & The capital of France is Paris. & reference\\
-FunctionGemma 270M & FPGA (F2, native kernels) & The capital of France is Paris. & yes\\
+FunctionGemma 270M & FPGA (fused kernels) & The capital of France is Paris. & yes\\
+FunctionGemma 270M & FPGA (per-op kernels) & The capital of France is Paris. & yes\\
 Gemma 3 1B & MLX gemma-3-1b-it-qat-4bit & The capital of France is Paris. & reference\\
-Gemma 3 1B & FPGA (F2, native kernels) & \emph{run in progress} & --\\
+Gemma 3 1B & FPGA (fused kernels) & The capital of France was Paris during the & no\\
+Gemma 3 1B & FPGA (per-op kernels) & The capital of France was Paris during the & no\\
+Gemma 3 1B & FPGA (speculative kernels) & The capital of France was Paris during the & no\\
 \bottomrule\end{tabular}}
 \newcommand{\fpgatable}{%
-\begin{tabular}{llrrrrr}\toprule
-Model & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\midrule
-FunctionGemma 270M & isl8 & 8 & 16 & 48.7 & 28.0 & 0.0358\\
-FunctionGemma 270M & chat & 16 & 8 & 66.8 & 27.7 & 0.0361\\
-FunctionGemma 270M & isl32 & 32 & 16 & 137.6 & 28.1 & 0.0356\\
-FunctionGemma 270M & isl64 & 64 & 16 & 289.7 & 29.3 & 0.0341\\
-FunctionGemma 270M & isl96 & 96 & 16 & 482.9 & 29.2 & 0.0343\\
-Gemma 3 1B & \emph{runs in progress} & & & & & \\
+\begin{tabular}{lllrrrrr}\toprule
+Model & Kernels & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\midrule
+FunctionGemma 270M & fused & chat & 16 & 8 & 67.6 & 11.6 & 0.0861\\
+FunctionGemma 270M & per-op & isl8 & 8 & 16 & 48.7 & 28.0 & 0.0358\\
+FunctionGemma 270M & per-op & chat & 16 & 8 & 66.8 & 27.7 & 0.0361\\
+FunctionGemma 270M & per-op & isl32 & 32 & 16 & 137.6 & 28.1 & 0.0356\\
+FunctionGemma 270M & per-op & isl64 & 64 & 16 & 289.7 & 29.3 & 0.0341\\
+FunctionGemma 270M & per-op & isl96 & 96 & 16 & 482.9 & 29.2 & 0.0343\\
+Gemma 3 1B & fused & chat & 16 & 8 & 297.2 & 41.4 & 0.0241\\
+Gemma 3 1B & per-op & chat & 16 & 8 & 298.3 & 72.6 & 0.0138\\
+Gemma 3 1B & speculative & chat & 16 & 8 & 299.8 & 66.6 & 0.0150\\
 \bottomrule\end{tabular}}
 \newcommand{\mlxtable}{%
 \begin{tabular}{llrrrr}\toprule

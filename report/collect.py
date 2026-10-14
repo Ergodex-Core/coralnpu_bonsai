@@ -52,6 +52,8 @@ def load_all():
       r = dict(r)
       r["model"] = d.get("model") or os.path.basename(path).split("_")[1]
       r["file"] = os.path.basename(path)
+      r["path"] = {"native": "per-op", "native-fused": "fused",
+                   "native-spec": "speculative"}.get(d.get("source"), d.get("source", ""))
       (mlx if d.get("source") == "mlx" else fpga).append(r)
   return fpga, mlx
 
@@ -81,26 +83,26 @@ def main():
     dev = [r for r in fpga if model_key(r["model"]) == mk and r.get("prompt") and "capital" in str(r["prompt"])]
     for r in ref:
       w(f"{MODEL_NAMES[mk]} & MLX {esc(r['model'].split('/')[-1])} & {esc(r['text'])} & reference\\\\")
-    for r in dev:
+    for r in sorted(dev, key=lambda r: r["path"]):
       match = "yes" if ref and r["generated"] == ref[0]["generated"] else ("no" if ref else "n/a")
-      w(f"{MODEL_NAMES[mk]} & FPGA (F2, native kernels) & {esc(r['text'])} & {match}\\\\")
+      w(f"{MODEL_NAMES[mk]} & FPGA ({esc(r['path'])} kernels) & {esc(r['text'])} & {match}\\\\")
     if not dev:
       w(f"{MODEL_NAMES[mk]} & FPGA (F2, native kernels) & \\emph{{run in progress}} & --\\\\")
   w("\\bottomrule\\end{tabular}}")
 
   # FPGA timing table.
   w("\\newcommand{\\fpgatable}{%")
-  w("\\begin{tabular}{llrrrrr}\\toprule")
-  w("Model & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\\\\midrule")
+  w("\\begin{tabular}{lllrrrrr}\\toprule")
+  w("Model & Kernels & Prompt & ISL & OSL & TTFT (s) & s/token & tok/s\\\\\\midrule")
   for mk in ("functiongemma-270m", "gemma3-1b"):
     rows = [r for r in fpga if model_key(r["model"]) == mk]
     if not rows:
-      w(f"{MODEL_NAMES[mk]} & \\emph{{runs in progress}} & & & & & \\\\")
-    for r in sorted(rows, key=lambda r: (r["isl"], r["osl"])):
+      w(f"{MODEL_NAMES[mk]} & & \\emph{{runs in progress}} & & & & & \\\\")
+    for r in sorted(rows, key=lambda r: (r["path"], r["isl"], r["osl"])):
       tps = r["decode_tokens_per_second"]
       label = r["prompt"] if isinstance(r["prompt"], str) else "synthetic"
       label = "chat" if "capital" in label else label
-      w(f"{MODEL_NAMES[mk]} & {esc(label)} & {r['isl']} & {r['osl']} & "
+      w(f"{MODEL_NAMES[mk]} & {esc(r['path'])} & {esc(label)} & {r['isl']} & {r['osl']} & "
         f"{r['ttft_seconds']:.1f} & {1 / tps:.1f} & {tps:.4f}\\\\")
   w("\\bottomrule\\end{tabular}}")
 

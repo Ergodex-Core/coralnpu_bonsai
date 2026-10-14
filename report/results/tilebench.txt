@@ -1,9 +1,6 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/home/ubuntu/coralnpu_models/models/tests/tilebench.py", line 48, in <module>
-    main()
-  File "/home/ubuntu/coralnpu_models/models/tests/tilebench.py", line 41, in main
-    print(f"{region} {label:24s}: {r.cycles:9d} cycles  {n / r.cycles:5.2f} B/cycle  "
-                                                         ~~^~~~~~~~~~
-ZeroDivisionError: division by zero
+DDR 16 x vle8 (same reg)    :   1595906 cycles   0.66 B/cycle   389.6 cycles per 256 B
+DDR vtle8 tile load (256 B) :   1595839 cycles   0.66 B/cycle   389.6 cycles per 256 B
+DDR 16 x vle8 (16 regs)     :   1595922 cycles   0.66 B/cycle   389.6 cycles per 256 B
+HBM 16 x vle8 (same reg)    :   1609944 cycles   0.65 B/cycle   393.1 cycles per 256 B
+HBM vtle8 tile load (256 B) :   1609866 cycles   0.65 B/cycle   393.0 cycles per 256 B
+HBM 16 x vle8 (16 regs)     :   1609953 cycles   0.65 B/cycle   393.1 cycles per 256 B

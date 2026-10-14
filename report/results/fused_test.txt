@@ -1,17 +1,28 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 232, in <module>
-    main()
-  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 203, in main
-    h = Harness(be, args.elf)
-        ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ubuntu/coralnpu_models/models/tests/fpga_fused_test.py", line 37, in __init__
-    self.image = dev.KernelImage(elf)
-                 ^^^^^^^^^^^^^^^^^^^^
-  File "/home/ubuntu/coralnpu_models/models/host/device.py", line 62, in __init__
-    self.kargs = self.elf.address("kargs")
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ubuntu/coralnpu_models/models/host/f2_device.py", line 347, in address
-    raise KeyError(f"missing symbol {name}")
-KeyError: 'missing symbol kargs'
+== rmsnorm
+  op 1: 33123 cycles
+  PASS
+== quant+matvec
+  op 2: 16794 cycles
+  op 3: 92521 cycles
+  matvec k=1152 n=64: 643 cycles per group-tile, max|err| 9.54e-07
+  PASS
+== rope
+  op 4: 4569 cycles
+  PASS
+== gelu
+  op 6: 58970 cycles
+  PASS
+== embed
+  op 7: 23640 cycles
+  PASS
+== topk
+  op 8: 70517 cycles
+  PASS
+== attention
+  op 5: 138344 cycles
+  PASS
+== full step
+  per-op  top-4 [236743, 870, 623, 11058] [4.377, 2.111, 1.985, 1.162]
+  fused   top-4 [236743, 870, 623, 11058] [4.377, 2.111, 1.985, 1.162]  276491614 cycles, 11.1 s
+  PASS
+failed: none
