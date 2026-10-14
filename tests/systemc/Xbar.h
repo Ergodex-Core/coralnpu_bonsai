@@ -30,6 +30,12 @@
 //   0x20000000  4 MiB memory (EXTMEM in coralnpu_tcm.ld.tpl), init 0xa5
 //   0x54000000  UART (line buffered to stdout)
 //   0x80000000  2 GiB DDR, allocated on first touch, init 0xa5
+//
+// SetLatency() adds external-memory latency to the memory and DDR regions.
+// The patched axi2tlm bridge counts read latency from AR acceptance, so reads
+// are pipelined (many outstanding, like a DRAM controller), matching
+// --axi_read_latency in the ArcSim and cocotb testbenches. Write latency is
+// counted from the last W beat to the B response.
 class Xbar : sc_core::sc_module {
  public:
   Xbar(sc_core::sc_module_name name) : sc_core::sc_module(std::move(name)) {
@@ -39,15 +45,22 @@ class Xbar : sc_core::sc_module {
 
   tlm_utils::simple_target_socket<Xbar>& socket() { return socket_; }
 
+  void SetLatency(sc_core::sc_time read, sc_core::sc_time write) {
+    read_latency_ = read;
+    write_latency_ = write;
+  }
+
   void b_transport(tlm::tlm_generic_payload& trans, sc_core::sc_time& delay) {
     sc_dt::uint64 addr = trans.get_address();
     unsigned int len = trans.get_data_length();
 
     if (InDdr(addr, len)) {
       ddr_b_transport_(trans, delay);
+      delay += trans.is_read() ? read_latency_ : write_latency_;
     } else if (((addr & kMemoryAddr) == kMemoryAddr) &&
         (addr + len < kMemoryAddr + kMemorySizeBytes)) {
       memory_b_transport_(trans, delay);
+      delay += trans.is_read() ? read_latency_ : write_latency_;
     } else if (addr == kUartAddr) {
       uart_b_transport_(trans, delay);
     } else {
@@ -219,6 +232,8 @@ class Xbar : sc_core::sc_module {
   std::unordered_map<uint64_t, std::unique_ptr<uint8_t[]>> ddr_pages_;
   uint8_t memory_[kMemorySizeBytes];
   std::vector<char> uart_buffer_;
+  sc_core::sc_time read_latency_ = sc_core::SC_ZERO_TIME;
+  sc_core::sc_time write_latency_ = sc_core::SC_ZERO_TIME;
   tlm_utils::simple_target_socket<Xbar> socket_;
 };
 

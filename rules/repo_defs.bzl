@@ -481,6 +481,9 @@ def define_sim_repos():
         strip_prefix = "libsystemctlm-soc-79d624f3c7300a2ead97ca35e683c38f0b6f5021",
         sha256 = "5c9d08bd33eb6738e3b4a0dda81e24a6d30067e8149bada6ae05aedcab5b786c",
         build_file = "@coralnpu_hw//third_party/libsystemctlm-soc:BUILD.bazel",
+        # Pipelined read latency in axi2tlm-bridge (see Xbar::SetLatency).
+        patches = ["@coralnpu_hw//third_party/libsystemctlm-soc:axi2tlm_pipelined_read_latency.patch"],
+        patch_args = ["-p1"],
     )
 
     maybe(

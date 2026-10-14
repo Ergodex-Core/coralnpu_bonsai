@@ -29,7 +29,8 @@ void rvv_matmul_int8(const int8_t *__restrict__ A, const int8_t *__restrict__ B,
                      int32_t *__restrict__ C, int M, int K, int N);
 
 int8_t lhs_input[MAX_M * MAX_K] __attribute__((aligned(16), section(".data")));
-int8_t rhs_input[MAX_K * MAX_N] __attribute__((aligned(16), section(".data")));
+// Weights stream from external memory, as on the FPGA.
+int8_t rhs_input[MAX_K * MAX_N] __attribute__((aligned(16), section(".ddr_data")));
 int32_t result_output[MAX_M * MAX_N] __attribute__((aligned(16), section(".data")));
 
 size_t active_m __attribute__((section(".data")));
