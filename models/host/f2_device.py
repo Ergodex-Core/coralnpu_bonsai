@@ -33,6 +33,12 @@ import subprocess
 import time
 
 AGFI = "agfi-075a98d106eb1b6bf"
+# Images with the same shell, address map and host interface as AGFI; the
+# host code runs unchanged on any of them.
+COMPATIBLE_AGFIS = {
+    AGFI: "run 054 (Alex, 2026-10-11)",
+    "agfi-0074b31b5fd1b9e53": "PR #12: LSU read-prefetch bridge (DBus2AxiStream)",
+}
 SHELL = "0x10212415"
 
 ITCM = (0x00000000, 8 * 1024)
@@ -294,10 +300,12 @@ def describe_loaded_image(slot):
   return row[2], row[3], row[-1]
 
 
-def require_image(slot, agfi=AGFI, shell=SHELL):
+def require_image(slot, agfi=None, shell=SHELL):
+  """Checks that a compatible image (agfi, or any of COMPATIBLE_AGFIS) is loaded."""
   loaded, status, loaded_shell = describe_loaded_image(slot)
-  if loaded != agfi or status != "loaded" or loaded_shell.lower() != shell.lower():
-    raise RuntimeError(f"expected {agfi} loaded on shell {shell} in slot {slot}; "
+  allowed = {agfi} if agfi else set(COMPATIBLE_AGFIS)
+  if loaded not in allowed or status != "loaded" or loaded_shell.lower() != shell.lower():
+    raise RuntimeError(f"expected one of {sorted(allowed)} loaded on shell {shell} in slot {slot}; "
                        f"found {loaded} {status} {loaded_shell}")
 
 
