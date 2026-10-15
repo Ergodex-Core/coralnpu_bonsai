@@ -1,0 +1,22 @@
+weights: 596.4 MiB to DDR in 1.6s
+buffers: 24.4 MiB in HBM
+> 'isl8'  ISL=8 OSL=8
+' lazy dog. This sentence uses figurative language'
+  TTFT 105.34s  decode 0.0428 tok/s  (23.4 s/token)  total 292.3s
+> 'isl32'  ISL=32 OSL=8
+' dog while The sun sets behind the distant'
+  TTFT 312.19s  decode 0.0426 tok/s  (23.4 s/token)  total 499.8s
+> 'isl64'  ISL=64 OSL=8
+' and The quick brown fox jumps over the'
+  TTFT 634.72s  decode 0.0424 tok/s  (23.6 s/token)  total 823.4s
+kernel        launches     cycles(total)   seconds
+gemma_decode        24      13863846163   554.677
+matvec_q4          917      12489672986   504.609
+gelu_mul           182       6009640333   241.498
+quant_act          735        883078865    37.639
+rmsnorm           1099        173641659    12.334
+attention          182        276101941    11.501
+rope               364         69026829     3.720
+topk                 7          7427587     0.315
+embed                7          3343905     0.162
+Wrote /home/ubuntu/ab/pf_gemma3-1b_isl_osl8.json

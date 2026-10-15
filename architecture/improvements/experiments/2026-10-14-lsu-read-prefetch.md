@@ -6,7 +6,7 @@
 | Owner | Claude Code (with Rachit) |
 | Branch / worktree | `arch-improvements` @ `1986101d` (RTL); PR #12; base `main` @ `3124faeb` |
 | Change class | A: memory RTL |
-| Status | win in simulation; FPGA image building |
+| Status | **win, confirmed on F2** |
 
 ## Result (one line)
 
@@ -40,7 +40,7 @@ Gemma 3 1B fused decode at F2-calibrated latency: **41.2 → 23.3 s/token (1.78�
 | T3 | `model_bench_cocotb_test{,_pf}`: real layers vs `ModelRef` | running | running |
 | T4 | ArcSim cross-check | — | ArcSim VME build in progress |
 | T5 | UVM co-sim | — | not run |
-| T6 | F2 | — | AFI building (`fpga/f2_afi/`) |
+| T6 | F2: `fpga_kernels_test`, `fpga_fused_test`, token runs | pass | pass; tokens identical to baseline in all 11 runs |
 
 New directed test: `DBus2AxiStreamTest.scala`. Its write-coherence case fails on a build with the write invalidation disabled (mutation checked 2026-10-14). The other three cases cover burst and outstanding behaviour, `flush`, and exact uncached reads.
 
@@ -79,13 +79,52 @@ Tool: Verilator (cocotb), clang-18 kernel ELFs, decode (`m = 1`). Memory latency
 
 ## 5. FPGA
 
-New AFI for `VmeCoreMiniPfAxi`-equivalent `CoralF2Axi`, built with `fpga/f2_afi/build_afi.sh`:
-- Run-054 package, HDK 2.3.0, Vivado 2025.2, 25 MHz.
-- Regenerating the baseline reproduces run 054's RTL bit-exactly.
-- Variant RTL differences are all from the bridge (15 files; see `package_pf/rtl_diff.txt` on the build instance).
-- Status: Vivado synthesis started 2026-10-14 ~14:00 UTC on `coralnpu-pr12-afi-build`.
-- AFI submission and F2 validation: pending, needs approval.
-- **Prediction to check on F2:** Gemma 3 1B fused decode ≈ **23 s/token** (from 41.4).
+New image built with `fpga/f2_afi/build_afi.sh`:
+- **AFI `afi-08098031e6fce544c` / AGFI `agfi-0074b31b5fd1b9e53`**
+- timing met: WNS +0.029 ns, WHS +0.010 ns, 0 violations
+- shell timing pins identical to run 054
+
+A/B on one F2 card (test instance `coralnpu-pr12-f2-test`, since terminated), against run 054 (`agfi-075a98d106eb1b6bf`). Same clang-18 kernels, weights and host code; fused decode kernel. Raw results: `2026-10-14-lsu-read-prefetch/fpga/`.
+
+- **Correctness:**
+  - `fpga_kernels_test` and `fpga_fused_test` pass on both images.
+  - **Every run is token-identical between the two images** (11 runs, two models).
+
+| Model | Prompt | TTFT before → after (s) | TTFT speedup | Decode before → after (s/token) | Decode speedup |
+|---|---|---|---|---|---|
+| FunctionGemma 270M | chat | 76.4 → 47.5 | 1.61× | 11.64 → 6.62 | **1.76×** |
+| FunctionGemma 270M | ISL 8 / OSL 16 | 58.3 → 38.3 | 1.52× | 11.56 → 6.60 | 1.75× |
+| FunctionGemma 270M | ISL 32 / OSL 16 | 157.6 → 95.9 | 1.64× | 11.90 → 6.66 | 1.79× |
+| FunctionGemma 270M | ISL 64 / OSL 16 | 330.2 → 196.6 | 1.68× | 12.33 → 6.73 | 1.83× |
+| FunctionGemma 270M | ISL 96 / OSL 16 | 514.7 → 299.2 | 1.72× | 12.76 → 6.84 | 1.86× |
+| FunctionGemma 270M | ISL 32 / OSL 32 | 158.0 → 96.0 | 1.65× | 12.00 → 6.69 | 1.79× |
+| Gemma 3 1B | chat | 310.8 → 156.6 | **1.98×** | 41.46 → 23.39 | **1.77×** |
+| Gemma 3 1B | ISL 8 / OSL 8 | 210.8 → 105.3 | 2.00× | 41.29 → 23.37 | 1.77× |
+| Gemma 3 1B | ISL 32 / OSL 8 | 625.8 → 312.2 | 2.00× | 41.81 → 23.45 | 1.78× |
+| Gemma 3 1B | ISL 64 / OSL 8 | 1272.8 → 634.7 | 2.01× | 42.38 → 23.59 | 1.80× |
+| Gemma 3 1B | ISL 32 / OSL 16 | 626.9 → 311.9 | 2.01× | 41.85 → 23.49 | 1.78× |
+
+**membench on F2, B/cycle (DDR and HBM agree within 0.05):**
+
+| Read size | Before | After |
+|---|---|---|
+| 16 B | 0.66 | **4.00** |
+| 32 B | 0.70 | **6.37** |
+| 64 B | 0.74 | **6.69** |
+| 128 B | 0.74 | **6.79** |
+
+Writes are unchanged (0.66–0.77).
+
+**Prediction vs hardware:**
+
+| Gemma 3 1B decode | Predicted | Measured |
+|---|---|---|
+| Fused routines, sim latency 15 | 23.3 s/token, 1.78× | **23.39 s/token, 1.77×** |
+| VisualSim-model twin | 1.77× | 1.77× |
+
+For 16 B reads, the predicted 3.98 B/cycle (LSU-issue bound) compares with **4.00** measured.
+
+**TTFT** improves more than decode (2.0× for 1B). Prefill runs the per-op kernels, which re-read activations from DRAM and so gain more from prefetch (3.0× per-op in sim at latency 24).
 
 ## 6. Reproduce
 

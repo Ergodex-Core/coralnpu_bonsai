@@ -1,0 +1,18 @@
+base tests done 08:03
+base functiongemma chat rc=0 08:06
+base gemma3-1b isl_osl8 rc=0 09:09
+base gemma3-1b isl32_osl16 rc=0 09:30
+SLICE_DONE base gemma3-1b 09:30
+base functiongemma isl_osl16 rc=0 10:02
+base functiongemma isl32_osl32 rc=0 10:11
+SLICE_DONE base functiongemma 10:11
+pf tests done 10:18
+pf functiongemma chat rc=0 10:19
+pf functiongemma isl_osl16 rc=0 10:37
+pf functiongemma isl32_osl32 rc=0 10:42
+SLICE_DONE pf functiongemma 10:42
+pf gemma3-1b chat rc=0 10:48
+pf gemma3-1b isl_osl8 rc=0 11:15
+pf gemma3-1b isl32_osl16 rc=0 11:27
+SLICE_DONE pf gemma3-1b 11:27
+AB_DONE
