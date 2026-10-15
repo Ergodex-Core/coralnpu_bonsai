@@ -169,8 +169,17 @@ EOF
     # create-fpga-image) is a separate, approved step; see README.md.
     name=${1:?tar <name>}
     is_done "tar_$name" && exit 0
-    grep -q PASS "$WORK/audit_$name/output/acceptance.txt" ||
-      { echo "audit_$name has not passed; inspect it first" >&2; exit 1; }
+    # Accept only a clean audit: every violation count zero and the shell's
+    # static timing pins unchanged from run 054.
+    acc=$WORK/audit_$name/output/acceptance.txt
+    for key in setup_violating_paths_found hold_violating_paths_found failing_timing_summary_categories \
+               error_drcs routing_error_or_critical_drcs blackboxes incomplete_nets \
+               pulse_width_failing_endpoints bus_skew_failing_constraints unreviewed_unconstrained_endpoints; do
+      grep -qx "$key=0" "$acc" || { echo "audit_$name: $key is not 0 ($acc)" >&2; exit 1; }
+    done
+    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(bool(d['added'] or d['removed']))" \
+      "$WORK/audit_$name/output/static_comparison.json" ||
+      { echo "audit_$name: static shell timing pins changed" >&2; exit 1; }
     ts=$(date -u +%Y_%m_%d-%H%M%S)
     out=$WORK/tar_$name/to_aws
     mkdir -p "$out"
