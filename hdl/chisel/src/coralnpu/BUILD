@@ -377,6 +377,19 @@ chisel_test(
 )
 
 chisel_test(
+    name = "coralnpu_dbus2axi_stream_tests",
+    size = "large",
+    srcs = [
+        "DBus2AxiStreamTest.scala",
+    ],
+    deps = [
+        ":coralnpu",
+        ":coralnpu_base",
+        "//hdl/chisel/src/bus",
+    ],
+)
+
+chisel_test(
     name = "coralnpu_fabric_arbiter_tests",
     size = "large",
     srcs = [
@@ -441,6 +454,7 @@ chisel_library(
     name = "coralnpu_base",
     srcs = [
         "DBus2Axi.scala",
+        "DBus2AxiStream.scala",
         "IBus2Axi.scala",
         "Interfaces.scala",
         "L1DCache.scala",
@@ -833,6 +847,21 @@ template_rule(
             ] + VME_CORE_MINI_AXI_COMMON_GEN_FLAGS,
             "module_name": "VmeCoreMiniAxi",
         },
+        # Same core with the LSU read-prefetch bridge (DBus2AxiStream).
+        "vme_core_mini_pf_axi_cc_library": {
+            "verilog_file_path": "VmeCoreMiniPfAxi.sv",
+            "extra_outs": [
+                "VVmeCoreMiniPfAxi_parameters.h",
+                "VmeCoreMiniPfAxi.zip",
+            ],
+            "gen_flags": [
+                "--moduleName=VmeCoreMiniPf",
+                "--itcmSizeKBytes=8",
+                "--dtcmSizeKBytes=32",
+                "--ebusPrefetchStreams=8",
+            ] + VME_CORE_MINI_AXI_COMMON_GEN_FLAGS,
+            "module_name": "VmeCoreMiniPfAxi",
+        },
         "vme_core_mini_verification_axi_cc_library": {
             "verilog_file_path": "VmeCoreMiniVerificationAxi.sv",
             "extra_outs": [
@@ -882,6 +911,24 @@ filter_files_by_extension(
     src = ":vme_core_mini_verification_axi_cc_library_emit_verilog",
     extensions = ["sv"],
 )
+
+# Single self-contained .sv files for simulators that take the emitted RTL
+# directly (ArcSim, see //tests/arcsim_sim).
+[
+    filter_files_by_extension(
+        name = "{}_cc_library_emit_verilog_single_sv".format(core),
+        src = ":{}_cc_library_emit_verilog".format(core),
+        extensions = ["sv"],
+    )
+    for core in [
+        "core_mini_axi",
+        "rvv_core_mini_axi",
+        "rvv_core_mini_highmem_axi",
+        "vme_core_mini_axi",
+        "vme_core_mini_pf_axi",
+        "vme_core_mini_highmem_axi",
+    ]
+]
 
 vcstatic_lint(
     name = "vme_core_mini_axi_cc_library_lint",

@@ -1,0 +1,16 @@
+weights: 596.4 MiB to DDR in 1.9s
+buffers: 24.4 MiB in HBM
+> 'isl32'  ISL=32 OSL=16
+' dog while The sun sets behind the distant mountains and This beautiful scene evokes feelings of'
+  TTFT 311.88s  decode 0.0426 tok/s  (23.5 s/token)  total 687.7s
+kernel        launches     cycles(total)   seconds
+gemma_decode        16       9244324104   369.884
+matvec_q4          262       3759938100   151.884
+gelu_mul            52       1848964211    74.279
+quant_act          210        271709486    11.493
+rmsnorm            314         53425018     3.821
+attention           52         56516597     2.339
+rope               104         21236947     1.134
+topk                 2          2121395     0.090
+embed                2          1028918     0.049
+Wrote /home/ubuntu/ab/pf_gemma3-1b_isl32_osl16.json

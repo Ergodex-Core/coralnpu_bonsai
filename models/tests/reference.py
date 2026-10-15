@@ -139,6 +139,7 @@ class ModelRef:
       act = gelu_tanh(gu[:, :H]) * gu[:, H:]
       down = self.linear(f"l{i}.down", act)
       x = rmsnorm(down, a[f"l{i}.post_ffw"], residual=h)
+    self.last_x = x  # residual stream after the last layer
     xn = rmsnorm(x[-1:], a["final_norm"])
     logits = self.linear("embed", xn)[0]
     self.pos += m

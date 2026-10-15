@@ -61,8 +61,28 @@
 //        11 post_attn 12 pre_ffw 13 post_ffw 14 q_norm 15 k_norm
 //        16 kcache 17 vcache 18 local(1/0) 19..21 reserved
 //
+// Stage timing: STAMP n adds the cycles since the previous stamp to
+// stage_cycles[n] (summed over layers; bss is zeroed per launch). Stages:
+//  0 embed            1 attn norm+quant   2 q/kv matvec      3 qk norm, rope, cache
+//  4 attention        5 o proj            6 post-attn+pre-ffw norm, quant
+//  7 gate_up matvec   8 gelu+quant        9 down matvec     10 post-ffw norm
+// 11 final norm+quant 12 logits + top-8
+// The host reads `stage_cycles` after a full step (op = 0).
+//
 // Register conventions inside routines: a0-a7 arguments, t0-t6 scratch,
 // s0-s11 callee-saved loop state. Vector registers are scratch everywhere.
+
+.macro STAMP n
+    csrr t0, mcycle
+    la   t1, stage_last
+    lw   t2, 0(t1)
+    sw   t0, 0(t1)
+    sub  t2, t0, t2
+    la   t1, stage_cycles + 4 * \n
+    lw   t3, 0(t1)
+    add  t3, t3, t2
+    sw   t3, 0(t1)
+.endm
 
 #define DARGS_LAYERS_OFF 224
 #define LAYER_WORDS 22
@@ -101,6 +121,8 @@ main:
     sw   s10, 16(sp)
     sw   s11, 12(sp)
     csrr s11, mcycle
+    la   t1, stage_last
+    sw   s11, 0(t1)
     la   s0, dargs
     lw   t0, 0(s0)             // op
     beqz t0, .Lfull_step
@@ -129,6 +151,7 @@ main:
     lw   a4, 8(s0)             // D
     flw  fa0, 112(s0)          // sqrt(D)
     jal  ra, embed_row
+    STAMP 0
     li   s1, 0                 // layer index
 .Llayer_loop:
     lw   t0, 4(s0)
@@ -147,6 +170,7 @@ main:
     lw   a0, 56(s0)            // xn
     lw   a1, 8(s0)             // D
     jal  ra, quant_act         // -> DTCM xq/sx/xsum8
+    STAMP 1
     lw   a0, 0(s2)             // q tiles
     lw   a1, 4(s2)             // q scales
     lw   a2, 60(s0)            // q out
@@ -162,6 +186,7 @@ main:
     lw   a4, 20(s0)
     slli a4, a4, 1             // N = 2*hd
     jal  ra, matvec
+    STAMP 2
     // q norm per head, k norm
     lw   s3, 16(s0)            // nh
     lw   s4, 20(s0)            // hd
@@ -234,6 +259,7 @@ main:
     add  a1, a1, t1            // v
     mv   a2, s4
     jal  ra, copy_f32
+    STAMP 3
     // attention
     lw   a0, 60(s0)            // q
     lw   a1, 64(s2)            // kcache
@@ -245,6 +271,7 @@ main:
     bnez t0, 6f
     li   a5, 0
 6:  jal  ra, attention
+    STAMP 4
     // o proj
     lw   a0, 68(s0)
     lw   a1, 16(s0)
@@ -257,6 +284,7 @@ main:
     mul  a3, a3, s4            // K = nh*hd
     lw   a4, 8(s0)             // N = D
     jal  ra, matvec
+    STAMP 5
     lw   a0, 72(s0)            // ao
     lw   a1, 44(s2)            // post_attn
     lw   a2, 52(s0)            // h
@@ -273,6 +301,7 @@ main:
     lw   a0, 56(s0)
     lw   a1, 8(s0)
     jal  ra, quant_act
+    STAMP 6
     lw   a0, 24(s2)            // gu tiles
     lw   a1, 28(s2)
     lw   a2, 76(s0)            // gate_up
@@ -280,6 +309,7 @@ main:
     lw   a4, 12(s0)
     slli a4, a4, 1             // N = 2H
     jal  ra, matvec
+    STAMP 7
     lw   a0, 76(s0)            // gate_up
     lw   a1, 80(s0)            // act
     lw   a2, 12(s0)            // H
@@ -287,18 +317,21 @@ main:
     lw   a0, 80(s0)
     lw   a1, 12(s0)
     jal  ra, quant_act
+    STAMP 8
     lw   a0, 32(s2)            // down tiles
     lw   a1, 36(s2)
     lw   a2, 72(s0)            // ao
     lw   a3, 12(s0)            // K = H
     lw   a4, 8(s0)             // N = D
     jal  ra, matvec
+    STAMP 9
     lw   a0, 72(s0)
     lw   a1, 52(s2)            // post_ffw
     lw   a2, 48(s0)            // x
     lw   a3, 8(s0)
     lw   a4, 52(s0)            // residual h
     jal  ra, rmsnorm
+    STAMP 10
     addi s1, s1, 1
     j    .Llayer_loop
 .Llayers_done:
@@ -311,6 +344,7 @@ main:
     lw   a0, 56(s0)
     lw   a1, 8(s0)
     jal  ra, quant_act
+    STAMP 11
     jal  ra, topk_init
     lw   a0, 36(s0)            // emb tiles
     lw   a1, 40(s0)            // emb scales
@@ -318,6 +352,7 @@ main:
     lw   a3, 8(s0)             // K = D
     lw   a4, 24(s0)            // N = V
     jal  ra, matvec
+    STAMP 12
 .Lok:
     li   a0, 0
 .Lexit:
@@ -1113,6 +1148,10 @@ dargs:
     .zero 224 + 32 * LAYER_WORDS * 4      // up to 32 layers
 
     .bss
+    .balign 16
+    .globl stage_cycles
+stage_cycles: .zero 13 * 4               // see STAMP
+stage_last:   .zero 4
     .balign 16
 accbuf:  .zero 64
 sxbuf:   .zero 1024                      // up to K = 32768

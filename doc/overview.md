@@ -255,6 +255,8 @@ bazel build //hdl/chisel/src/coralnpu:VmeCoreMiniAxi.sv
 
 CoralNPU provides cycle-accurate SystemC/Verilator simulators for running, validating, and debugging compiled RISC-V ELF executables.
 
+> The same ELFs can also run on ArcSim (`//tests/arcsim_sim:{core_mini_axi,rvv_core_mini_axi,vme_core_mini_axi}_sim`, `--config=arcsim`). It takes the same `--binary`/`--cycles` flags and needs a Linux x86-64 host with a licensed ArcSim toolchain. See [arcsim.md](arcsim.md).
+
 ### 1. Simulator Variants and Verification Flavors
 
 Simulators are parameterized by core architecture, memory size, and verification support:

@@ -29,6 +29,9 @@ in the RTL, not measured in simulation, unless a chapter says otherwise.
 **Suggested reading order:** 1 → 2 → 3 for the base core; 4 → 5 for vector and
 matrix; 6 for SoC integration; 7 to build, run and verify software.
 
+**Improvements:** [Gemma inference: priority architecture improvements](improvements/01-gemma-inference-priorities.md)
+ranks hardware changes for TTFT and tokens/s using the F2, Verilator and ArcSim runs.
+
 ---
 
 ## System at a glance

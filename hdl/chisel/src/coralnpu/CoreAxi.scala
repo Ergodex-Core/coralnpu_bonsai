@@ -263,6 +263,7 @@ class CoreAxi(p: Parameters, coreModuleName: String) extends RawModule {
     val ebus2axi = DBus2Axi(p, id = 0)
     ebus2axi.io.dbus <> core.io.ebus.dbus
     ebus2axi.io.fault <> core.io.ebus.fault
+    ebus2axi.io.flush := csr.io.reset || core.io.halted
 
     // AXI Arbitration
     // Write channel: only ebus uses it.

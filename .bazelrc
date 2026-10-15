@@ -41,8 +41,8 @@ test --java_runtime_version=remotejdk_11
 
 common --repo_env BAZEL_JVM_FETCH_SOURCES=false
 
-# Skip VCS by default as most workstations will not have licenses.
-build --build_tag_filters="-vcs,-synthesis,-power,-spyglass"
+# Skip VCS and ArcSim by default as most workstations will not have licenses.
+build --build_tag_filters="-vcs,-arcsim,-synthesis,-power,-spyglass"
 build --action_env=VCS_HOME
 build --host_action_env=VCS_HOME
 build --action_env=VC_STATIC_HOME
@@ -57,8 +57,8 @@ build --action_env=LICENSE_SERVER_VCSSIM
 build --host_action_env=LICENSE_SERVER_VCSSIM
 build --action_env=XILINXD_LICENSE_FILE
 build --host_action_env=XILINXD_LICENSE_FILE
-test --build_tag_filters="-vcs,-synthesis,-power,-spyglass"
-test --test_tag_filters="-vcs,-synthesis,-power,-spyglass"
+test --build_tag_filters="-vcs,-arcsim,-synthesis,-power,-spyglass"
+test --test_tag_filters="-vcs,-arcsim,-synthesis,-power,-spyglass"
 test --action_env=VCS_HOME
 test --host_action_env=VCS_HOME
 test --action_env=VC_STATIC_HOME
@@ -100,6 +100,16 @@ run:vcs --build_tag_filters="vcs"
 run:vcs --test_tag_filters="vcs"
 run:vcs --action_env=PATH
 run:vcs --host_action_env=PATH
+
+# Add config to enable ArcSim targets (see doc/arcsim.md). The toolchain is
+# found via ARCSIM_HOME, else ~/.cache/arcsim/<bundle>.
+build:arcsim --build_tag_filters="arcsim"
+build:arcsim --action_env=PATH
+build:arcsim --host_action_env=PATH
+test:arcsim --build_tag_filters="arcsim"
+test:arcsim --test_tag_filters="arcsim"
+run:arcsim --build_tag_filters="arcsim"
+run:arcsim --test_tag_filters="arcsim"
 
 # Add config to enable synthesis targets.
 build:synthesis --build_tag_filters="synthesis"

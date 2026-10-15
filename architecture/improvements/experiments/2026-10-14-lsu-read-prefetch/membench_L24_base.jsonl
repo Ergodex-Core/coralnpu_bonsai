@@ -1,0 +1,4 @@
+PERF {"op": "membench_read_16", "kernel": "membench", "model": "gemma3-1b", "m": 1, "shape": {"n": 65536, "chunk": 16}, "cycles": 127049, "bytes_per_cycle": 0.516, "read_latency": 24}
+PERF {"op": "membench_write_16", "kernel": "membench", "model": "gemma3-1b", "m": 1, "shape": {"n": 65536, "chunk": 16}, "cycles": 131141, "bytes_per_cycle": 0.5, "read_latency": 24}
+PERF {"op": "membench_read_128", "kernel": "membench", "model": "gemma3-1b", "m": 1, "shape": {"n": 65536, "chunk": 128}, "cycles": 119879, "bytes_per_cycle": 0.547, "read_latency": 24}
+PERF {"op": "membench_write_128", "kernel": "membench", "model": "gemma3-1b", "m": 1, "shape": {"n": 65536, "chunk": 128}, "cycles": 120389, "bytes_per_cycle": 0.544, "read_latency": 24}

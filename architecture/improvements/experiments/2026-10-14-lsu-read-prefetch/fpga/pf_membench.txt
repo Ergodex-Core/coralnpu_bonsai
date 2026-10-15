@@ -1,0 +1,12 @@
+DDR read   16B:    262242 cycles   4.00 B/cycle    100.0 MB/s @25MHz     4.0 cycles/load
+DDR read   32B:    164565 cycles   6.37 B/cycle    159.3 MB/s @25MHz     5.0 cycles/load
+DDR read   64B:    156729 cycles   6.69 B/cycle    167.3 MB/s @25MHz     9.6 cycles/load
+DDR read  128B:    154447 cycles   6.79 B/cycle    169.7 MB/s @25MHz    18.9 cycles/load
+DDR write  16B:   1595973 cycles   0.66 B/cycle     16.4 MB/s @25MHz    24.4 cycles/store
+DDR write 128B:   1367989 cycles   0.77 B/cycle     19.2 MB/s @25MHz   167.0 cycles/store
+HBM read   16B:    262244 cycles   4.00 B/cycle    100.0 MB/s @25MHz     4.0 cycles/load
+HBM read   32B:    164820 cycles   6.36 B/cycle    159.0 MB/s @25MHz     5.0 cycles/load
+HBM read   64B:    157987 cycles   6.64 B/cycle    165.9 MB/s @25MHz     9.6 cycles/load
+HBM read  128B:    154015 cycles   6.81 B/cycle    170.2 MB/s @25MHz    18.8 cycles/load
+HBM write  16B:   1638473 cycles   0.64 B/cycle     16.0 MB/s @25MHz    25.0 cycles/store
+HBM write 128B:   1466441 cycles   0.72 B/cycle     17.9 MB/s @25MHz   179.0 cycles/store

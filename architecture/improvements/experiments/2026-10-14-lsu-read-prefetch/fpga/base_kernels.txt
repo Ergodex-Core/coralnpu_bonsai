@@ -1,0 +1,33 @@
+== topk
+  topk: 41330 cycles, 2.4 ms
+  PASS (0.1s)
+== topk_big
+  topk: 1816546 cycles, 76.0 ms
+  PASS (0.1s)
+== matvec_decode
+  matvec_q4: 83114 cycles, 4.1 ms
+  decode k=1152 n=64: max |err| 1.19e-06
+  PASS (0.2s)
+== quant_act
+  quant_act: 10862 cycles, 0.7 ms
+  PASS (0.0s)
+== rmsnorm
+  rmsnorm: 8625 cycles, 0.8 ms
+  PASS (0.0s)
+== gelu_mul
+  gelu_mul: 34063 cycles, 2.4 ms
+  PASS (0.0s)
+== embed
+  embed: 7208 cycles, 0.8 ms
+  PASS (0.0s)
+== rope
+  rope: 11086 cycles, 0.8 ms
+  PASS (0.0s)
+== attention
+  attention: 27617 cycles, 2.4 ms
+  PASS (0.1s)
+== matvec_q4
+  matvec_q4: 7653 cycles, 0.8 ms
+  max |err| 1.19e-07
+  PASS (0.2s)
+failed: none

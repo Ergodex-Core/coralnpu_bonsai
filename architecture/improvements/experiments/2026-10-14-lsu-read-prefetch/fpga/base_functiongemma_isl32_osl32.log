@@ -1,0 +1,17 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+weights: 160.0 MiB to DDR in 0.6s
+buffers: 21.3 MiB in HBM
+> 'isl32'  ISL=32 OSL=32
+' dog while the sun sets behind the distant mountains and the river flows quietly. Both conditions are impossible because the water level in the immediate valley below is only 1'
+  TTFT 158.04s  decode 0.0833 tok/s  (12.0 s/token)  total 542.1s
+kernel        launches     cycles(total)   seconds
+gemma_decode        32       9329595945   373.355
+matvec_q4          182       1857414444    75.039
+gelu_mul            36        418728767    16.854
+attention           36        185134382     7.709
+quant_act          146         93531971     4.986
+rmsnorm            218         62704460     3.220
+rope                72         27768786     1.398
+topk                 2          3627804     0.152
+embed                2           729081     0.049
+Wrote /home/ubuntu/ab/base_functiongemma_isl32_osl32.json

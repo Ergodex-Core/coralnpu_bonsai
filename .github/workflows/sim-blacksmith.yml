@@ -1,0 +1,179 @@
+# Verilator and ArcSim simulators on Blacksmith runners.
+#
+# - verilator: builds the Verilator AXI simulators and runs the examples.
+# - arcsim:    installs the ArcSim developer bundle, runs the ArcSim-vs-Verilator
+#              differential tests, then compares simulation speed on the same
+#              machine. The table lands in the job summary and as an artifact.
+#
+# The ArcSim job needs the repository secret ARCSIM_BUNDLE_URL: an HTTPS URL
+# (e.g. a presigned S3 link) for arcsim-coral-matrix-baseline-20261013.zip.
+# Without it the ArcSim steps are skipped. See doc/arcsim.md.
+name: Simulators (Blacksmith)
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Runs per program for the perf comparison"
+        default: "3"
+  pull_request:
+    paths:
+      - ".github/workflows/sim-blacksmith.yml"
+      - "hdl/chisel/**"
+      - "rules/arcsim*.bzl"
+      - "rules/verilator.bzl"
+      - "tests/arcsim_sim/**"
+      - "tests/verilator_sim/**"
+      - "utils/arcsim/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PERF_RUNS: ${{ github.event.inputs.runs || '3' }}
+
+jobs:
+  verilator:
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 1
+          ssh-key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - id: id
+        run: |
+          echo "uid=$(id -u)" >> $GITHUB_OUTPUT
+          echo "gid=$(id -g)" >> $GITHUB_OUTPUT
+      - name: Build dev container
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: utils/coralnpu.dockerfile
+          push: false
+          load: true
+          tags: coralnpu:latest
+          build-args: |
+            _UID=${{ steps.id.outputs.uid }}
+            _GID=${{ steps.id.outputs.gid }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Verilator simulators and examples
+        run: |
+          docker run --rm --init --ipc=host \
+            -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} \
+            -v $HOME:/home/runner -v $HOME:/home/builder \
+            coralnpu:latest \
+            bazel build --noshow_progress \
+              //tests/verilator_sim:core_mini_axi_sim \
+              //tests/verilator_sim:rvv_core_mini_axi_sim \
+              //examples:coralnpu_v2_hello_world_add_floats \
+              //examples:coralnpu_v2_rvv_add_intrinsic
+      - name: Run examples on Verilator
+        run: |
+          docker run --rm --init --ipc=host \
+            -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} \
+            -v $HOME:/home/runner -v $HOME:/home/builder \
+            coralnpu:latest bash -euo pipefail -c '
+              elf() { bazel cquery --output=files "$1" 2>/dev/null | grep "\.elf$"; }
+              {
+                echo "### Verilator runs on $(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2)"
+                echo
+                echo "| Simulator | Program | Result |"
+                echo "| --- | --- | --- |"
+                for sim in core_mini_axi_sim rvv_core_mini_axi_sim; do
+                  for prog in coralnpu_v2_hello_world_add_floats coralnpu_v2_rvv_add_intrinsic; do
+                    [[ $sim == core_mini_axi_sim && $prog == *rvv* ]] && continue
+                    line=$(bazel-bin/tests/verilator_sim/$sim --binary "$(elf //examples:$prog)" | grep "^VERILATOR " || true)
+                    echo "| $sim | $prog | ${line:-no summary line} |"
+                  done
+                done
+              } | tee verilator-runs.md'
+          cat verilator-runs.md >> "$GITHUB_STEP_SUMMARY"
+
+  arcsim:
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    timeout-minutes: 360
+    env:
+      ARCSIM_BUNDLE_URL: ${{ secrets.ARCSIM_BUNDLE_URL }}
+    steps:
+      - name: Check ArcSim bundle secret
+        id: gate
+        run: |
+          if [[ -z "${ARCSIM_BUNDLE_URL}" ]]; then
+            echo "ARCSIM_BUNDLE_URL is not set; skipping ArcSim." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "enabled=false" >> $GITHUB_OUTPUT
+          else
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          fetch-depth: 1
+          ssh-key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.gate.outputs.enabled == 'true'
+      - id: id
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          echo "uid=$(id -u)" >> $GITHUB_OUTPUT
+          echo "gid=$(id -g)" >> $GITHUB_OUTPUT
+      - name: Build dev container
+        if: steps.gate.outputs.enabled == 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: utils/coralnpu.dockerfile
+          push: false
+          load: true
+          tags: coralnpu:latest
+          build-args: |
+            _UID=${{ steps.id.outputs.uid }}
+            _GID=${{ steps.id.outputs.gid }}
+          cache-from: type=gha
+      - name: Install ArcSim bundle
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/arcsim-coral-matrix-baseline-20261013.zip" "${ARCSIM_BUNDLE_URL}"
+          docker run --rm --init \
+            -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} \
+            -v $HOME:/home/runner -v $HOME:/home/builder -v "$RUNNER_TEMP:$RUNNER_TEMP" \
+            coralnpu:latest \
+            utils/arcsim/setup_arcsim.sh bundle "$RUNNER_TEMP/arcsim-coral-matrix-baseline-20261013.zip"
+          rm -f "$RUNNER_TEMP/arcsim-coral-matrix-baseline-20261013.zip"
+      - name: ArcSim vs Verilator differential tests
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          docker run --rm --init --ipc=host \
+            -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} \
+            -v $HOME:/home/runner -v $HOME:/home/builder \
+            coralnpu:latest \
+            bazel test --config=arcsim --noshow_progress --test_output=all \
+              //tests/arcsim_sim:all
+      - name: Verilator vs ArcSim performance
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          summary_dir="$(dirname "$GITHUB_STEP_SUMMARY")"
+          mkdir -p perf
+          for core in core_mini_axi rvv_core_mini_axi vme_core_mini_axi; do
+            docker run --rm --init --ipc=host \
+              -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} \
+              -v $HOME:/home/runner -v $HOME:/home/builder \
+              -v "$summary_dir:$summary_dir" -e GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" \
+              coralnpu:latest \
+              bazel run --config=arcsim --noshow_progress //tests/arcsim_sim:${core}_perf -- \
+                --runs="${PERF_RUNS}" --json="${{ github.workspace }}/perf/${core}.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.enabled == 'true'
+        with:
+          name: arcsim-perf
+          path: perf/
+          if-no-files-found: ignore

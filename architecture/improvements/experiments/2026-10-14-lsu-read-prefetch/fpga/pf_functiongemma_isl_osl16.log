@@ -1,0 +1,26 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+weights: 160.0 MiB to DDR in 0.6s
+buffers: 21.3 MiB in HBM
+> 'isl8'  ISL=8 OSL=16
+" cooling water!I'm feeling very down, and I'm missing"
+  TTFT 38.29s  decode 0.1514 tok/s  (6.6 s/token)  total 143.9s
+> 'isl32'  ISL=32 OSL=16
+' dog while the sun sets behind the distant mountains and the river flows quietly. Both'
+  TTFT 95.86s  decode 0.1502 tok/s  (6.7 s/token)  total 202.4s
+> 'isl64'  ISL=64 OSL=16
+' and the river flows quietly.The quick brown fox jumps over the lazy'
+  TTFT 196.60s  decode 0.1485 tok/s  (6.7 s/token)  total 304.3s
+> 'isl96'  ISL=96 OSL=16
+' fox jumps over the lazy dog while the sun sets behind the distant mountains and the'
+  TTFT 299.16s  decode 0.1462 tok/s  (6.8 s/token)  total 408.6s
+kernel        launches     cycles(total)   seconds
+gemma_decode        64      10183561270   407.709
+matvec_q4         1183       3964795941   163.222
+gelu_mul           234       2365277989    95.713
+quant_act          949        499998334    22.198
+attention          234        521059037    21.697
+rmsnorm           1417        153267961    10.556
+rope               468         91892838     4.940
+topk                13         13789325     0.586
+embed               13          3578954     0.179
+Wrote /home/ubuntu/ab/pf_functiongemma_isl_osl16.json

@@ -33,6 +33,31 @@
 
 static float acc[MAX_TOKENS][TILE_N] __attribute__((aligned(16)));
 
+// Decode staging (m == 1): the activation row and its per-group scales are
+// read again for every 16-channel output tile, so they are copied to DTCM once
+// per call. Only the weights and weight scales then stream from DRAM, which
+// keeps them within the LSU read-prefetch bridge's streams (DBus2AxiStream).
+#define MAX_STAGED_K 8192
+static int8_t xq_staged[MAX_STAGED_K] __attribute__((aligned(16)));
+static float sx_staged[MAX_STAGED_K / Q4_GROUP] __attribute__((aligned(16)));
+static float xsum8_staged[MAX_STAGED_K / Q4_GROUP] __attribute__((aligned(16)));
+
+// Copies n bytes (a multiple of 16) with up to 128-byte vector accesses.
+static void vcopy(void* dst, const void* src, uint32_t n) {
+  __asm__ volatile(
+      "1:\n\t"
+      "vsetvli t0, %[n], e8, m8, ta, ma\n\t"
+      "vle8.v v8, (%[s])\n\t"
+      "vse8.v v8, (%[d])\n\t"
+      "add %[s], %[s], t0\n\t"
+      "add %[d], %[d], t0\n\t"
+      "sub %[n], %[n], t0\n\t"
+      "bnez %[n], 1b\n\t"
+      : [d] "+r"(dst), [s] "+r"(src), [n] "+r"(n)
+      :
+      : "t0", "memory", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15");
+}
+
 #define MSETMTYPE ".insn r 0x57, 7, 0x41, x0, t5, t6\n\t"
 #define MSETTM    ".insn r 0x57, 7, 0x42, t6, t5, x1\n\t"
 #define MSETTN    ".insn r 0x57, 7, 0x42, t6, t5, x0\n\t"
@@ -174,6 +199,15 @@ static int run(KernelArgs* a) {
   float* out = (float*)a->out0;
   const uint32_t out_stride = a->u0, tile0 = a->u1;
   const int accumulate = a->flags & 1;
+  if (m == 1 && xq1d && k <= MAX_STAGED_K) {
+    const uint32_t sbytes = (groups * 4 + 15) & ~15u;  // rows are [16][groups]
+    vcopy(xq_staged, xq1d, k);
+    vcopy(sx_staged, sx, sbytes);
+    vcopy(xsum8_staged, xsum8, sbytes);
+    xq1d = xq_staged;
+    sx = sx_staged;
+    xsum8 = xsum8_staged;
+  }
 
   for (uint32_t t = 0; t < tiles; ++t) {
     for (uint32_t i = 0; i < m; ++i)

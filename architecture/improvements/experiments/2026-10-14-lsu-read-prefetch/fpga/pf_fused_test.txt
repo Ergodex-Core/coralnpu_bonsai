@@ -1,0 +1,24 @@
+== rmsnorm
+  op 1: 11792 cycles
+  PASS
+== quant+matvec
+  op 2: 10592 cycles
+  op 3: 50394 cycles
+  matvec k=1152 n=64: 350 cycles per group-tile, max|err| 9.54e-07
+  PASS
+== rope
+  op 4: 2306 cycles
+  PASS
+== gelu
+  op 6: 34911 cycles
+  PASS
+== embed
+  op 7: 18224 cycles
+  PASS
+== topk
+  op 8: 47430 cycles
+  PASS
+== attention
+  op 5: 24670 cycles
+  PASS
+failed: none

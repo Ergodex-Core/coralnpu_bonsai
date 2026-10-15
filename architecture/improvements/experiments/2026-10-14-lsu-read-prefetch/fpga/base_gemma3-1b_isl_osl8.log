@@ -1,0 +1,23 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+weights: 596.4 MiB to DDR in 1.9s
+buffers: 24.4 MiB in HBM
+> 'isl8'  ISL=8 OSL=8
+' lazy dog. This sentence uses figurative language'
+  TTFT 210.81s  decode 0.0242 tok/s  (41.3 s/token)  total 541.1s
+> 'isl32'  ISL=32 OSL=8
+' dog while The sun sets behind the distant'
+  TTFT 625.80s  decode 0.0239 tok/s  (41.8 s/token)  total 960.2s
+> 'isl64'  ISL=64 OSL=8
+' and The quick brown fox jumps over the'
+  TTFT 1272.78s  decode 0.0236 tok/s  (42.4 s/token)  total 1611.8s
+kernel        launches     cycles(total)   seconds
+matvec_q4          917      36775208427  1476.825
+gemma_decode        24      24878136851   995.262
+gelu_mul           182       6648318452   266.989
+attention          182       1330389994    54.541
+quant_act          735       1032531134    45.759
+rmsnorm           1099        455703612    22.232
+rope               364        130347080     6.596
+topk                 7         12704631     0.530
+embed                7          4259775     0.222
+Wrote /home/ubuntu/ab/base_gemma3-1b_isl_osl8.json

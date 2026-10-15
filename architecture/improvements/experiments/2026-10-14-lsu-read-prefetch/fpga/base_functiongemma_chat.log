@@ -1,0 +1,17 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+weights: 160.0 MiB to DDR in 0.6s
+buffers: 21.3 MiB in HBM
+> 'What is the capital of France?'  ISL=16 OSL=8
+'The capital of France is Paris.'
+  TTFT 76.36s  decode 0.0859 tok/s  (11.6 s/token)  total 157.8s
+kernel        launches     cycles(total)   seconds
+gemma_decode         7       1973360018    78.968
+matvec_q4           91        928724978    37.541
+gelu_mul            18        209272585     8.469
+quant_act           73         46766372     2.495
+attention           18         48513712     2.095
+rmsnorm            109         31350882     1.591
+rope                36         13887729     0.692
+topk                 1          1818416     0.076
+embed                1           364488     0.024
+Wrote /home/ubuntu/ab/base_functiongemma_chat.json

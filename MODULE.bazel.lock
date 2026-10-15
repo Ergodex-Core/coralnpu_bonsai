@@ -234,7 +234,7 @@
   "moduleExtensions": {
     "//rules:extensions.bzl%coralnpu_deps_ext": {
       "general": {
-        "bzlTransitiveDigest": "3kTc3RT2btZYad+VNQKC5CsXoMH8OzeKfJdAEGiyGxs=",
+        "bzlTransitiveDigest": "nmDho3xlP1IfXsMKnjggSQ2nEtgWlMpxh8kQm2C+4ag=",
         "usagesDigest": "1CqV4EO7uDyVS9gQSAvjLugLlCTYAZrVJ16YUY5hgpI=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools",
@@ -243,6 +243,10 @@
         "generatedRepoSpecs": {
           "coralnpu_host_cpus": {
             "repoRuleId": "@@//rules:host_cpus.bzl%host_cpus",
+            "attributes": {}
+          },
+          "arcsim": {
+            "repoRuleId": "@@//rules:arcsim_repo.bzl%arcsim_repo",
             "attributes": {}
           },
           "cvfpu": {

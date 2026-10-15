@@ -126,6 +126,20 @@ verilator_cocotb_model(
     ],
 )
 
+verilator_cocotb_model(
+    name = "vme_core_mini_pf_axi_model",
+    cflags = VERILATOR_BUILD_ARGS + [
+        "-DZVT_ON",
+        "-DZVTBF16FMM_ON",
+    ],
+    hdl_toplevel = "VmeCoreMiniPfAxi",
+    trace = False,
+    verilog_source = "//hdl/chisel/src/coralnpu:VmeCoreMiniPfAxi.sv",
+    deps = [
+        "//hdl/verilog:sram_backdoor",
+    ],
+)
+
 # BEGIN_TESTCASES_FOR_core_mini_axi_sim_cocotb
 CORE_MINI_AXI_SIM_TESTCASES = [
     ("core_mini_axi_basic_write_read_memory", "large"),

@@ -19,6 +19,7 @@ py_library(
     srcs = [
         "device.py",
         "f2_device.py",
+        "fused.py",
         "runtime.py",
         "weights.py",
     ],

@@ -21,6 +21,8 @@
 #include <map>
 #include <optional>
 #include <queue>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -204,6 +206,15 @@ struct CoreMiniAxi_tb : Sysc_tb {
   bool tohost_halt    = false;
   uint32_t tohost_val = 0;
 
+  // 32-bit values written to ELF symbols after the ELF is loaded and before
+  // the core starts (e.g. kernel shape parameters). Call before LoadElf*.
+  void SetSymbolOverrides(std::vector<std::pair<std::string, uint32_t>> overrides) {
+    symbol_overrides_ = std::move(overrides);
+  }
+  // Reads the 32-bit value at an ELF symbol of the loaded program, from TCM
+  // (SRAM backdoor) or testbench memory. Use after the core has halted.
+  absl::Status ReadSymbol(const std::string &name, uint32_t *value);
+
   absl::Status LoadElfSync(const std::string &file_name);
   absl::Status LoadElfAsync(const std::string &file_name);
   void BackdoorLoad(uint64_t addr, const uint8_t *data, size_t len);
@@ -252,6 +263,9 @@ struct CoreMiniAxi_tb : Sysc_tb {
   DebugIO debug_io_;
   DebugModuleIO dm_io_;
   Xbar xbar_;
+  std::vector<std::pair<std::string, uint32_t>> symbol_overrides_;
+  std::deque<uint32_t> symbol_override_storage_;  // Stable addresses.
+  std::vector<uint8_t> elf_data_;                 // For ReadSymbol lookups.
   std::optional<std::function<void()>> wfi_cb_;
   std::optional<std::function<void()>> halted_cb_;
 

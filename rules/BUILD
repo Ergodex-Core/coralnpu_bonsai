@@ -45,3 +45,12 @@ bool_flag(
     build_setting_default = False,
     visibility = ["//visibility:public"],
 )
+
+# Keep RTL assertions in ArcSim models (matches Verilator). Set
+# --//rules:arcsim_assertions=false to build with --ignore-assertions and
+# -DSYNTHESIS, the configuration the ArcSim benchmark bundles were validated in.
+bool_flag(
+    name = "arcsim_assertions",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)

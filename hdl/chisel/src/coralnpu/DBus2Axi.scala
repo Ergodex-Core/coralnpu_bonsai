@@ -25,7 +25,8 @@ import scala.annotation.nowarn
 
 object DBus2Axi {
   def apply(p: Parameters, id: Int = 0): DBus2Axi = {
-    return Module(new DBus2AxiV2(p, id))
+    if (p.ebusPrefetchStreams > 0) Module(new DBus2AxiStream(p, id))
+    else Module(new DBus2AxiV2(p, id))
   }
 }
 
@@ -45,6 +46,7 @@ class DBus2Axi(p: Parameters) extends Module {
     val dbus  = Flipped(new DBusIO(p))
     val axi   = new AxiMasterIO(p.axi2AddrBits, p.axi2DataBits, p.axi2IdBits)
     val fault = Valid(new FaultInfo(p))
+    val flush = Input(Bool()) // drop prefetched data (DBus2AxiStream)
   })
 }
 
